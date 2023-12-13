@@ -291,9 +291,9 @@ void setup()
     pinMode(AIN2, OUTPUT);
     pinMode(BIN1, OUTPUT);
     pinMode(BIN2, OUTPUT);
-    //pinMode(trigPin, OUTPUT);
-    //pinMode(echoPin, INPUT);
-    //digitalWrite(trigPin, LOW);
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+    digitalWrite(trigPin, LOW);
     servo.attach(servoPin, 400, 2740);
     servo.write(angle);
 }
@@ -314,7 +314,7 @@ void loop()
     }
     else{
       if(millis() - lastUS > 100){
-        //distance = hc.dist();
+        distance = hc.dist();
         lastUS = millis();
       }
     }
