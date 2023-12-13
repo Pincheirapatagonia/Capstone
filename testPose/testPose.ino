@@ -254,7 +254,7 @@ void loop() {
             state_pid_pose = 1;
             e_prev_giro = 0;
             inte_prev_giro = 0;
-            Serial.println("CAMGIO A 1");
+          
         }
         else{
             inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
@@ -276,7 +276,6 @@ void loop() {
                 state_pid_pose = 2;
                 e_prev_desp = 0;
                 inte_prev_desp = 0;
-                Serial.println("CAMGIO A 2");
             }
             else {
                 inte_desp = inte_prev_desp + (dt * (e_desp + e_prev_desp) / 2);
@@ -293,7 +292,7 @@ void loop() {
         e_giro = Pose_Theta_final - Pose_Theta;
         if (e_giro < e_giro_margin){
             state_pid_pose = 3;
-            Serial.println("CAMGIO A 3");
+            
         }
         else{
             inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
@@ -322,41 +321,33 @@ void loop() {
     inte_prev_A = inte_A;
     inte_prev_B = inte_B;
     
-    //WriteDriverVoltageA(PWM_A_val);
-    //WriteDriverVoltageB(PWM_B_val);
 
 
-    Serial.print(t);
-    Serial.print(", ");
-    Serial.print("state: ");
-    Serial.print(state_pid_pose);
-    //Serial.print("RPMROT:");
-    //Serial.print(round(RPM_Rot_ref));
-    //Serial.print(" RPMDESP:");
-    //Serial.print(round(RPM_Desp_ref));
-    //Serial.print(" PWMA:");
-    //Serial.print(PWM_A_val);
-    //Serial.print(" PWMB:");
-    //Serial.print(PWM_B_val);
-
-    //Serial.print(", Egiro: ");
-    //Serial.print(e_giro);
-    //Serial.print(", Edesp: ");
-    //Serial.print(e_desp);
-
-    Serial.print(", VelX: ");
+    Serial.print("VelX: ");
+    Serial.print(",");
     Serial.print(mpu_x_vel);
-    Serial.print(", VelY: ");
-    Serial.print(mpu_y_vel));
-    Serial.print(", VelTheta: ");
+    Serial.print(",");
+    Serial.print("VelY: ");
+    Serial.print(mpu_y_vel);
+    Serial.print(",");
+    Serial.print("AcelX: ");
+    Serial.print(g.acceleration.x);
+    Serial.print(",");
+    Serial.print("AcelY: ");
+    Serial.print(g.acceleration.y);
+    Serial.print(",");
+    Serial.print("VelTheta: ");
     Serial.print(Vel_Theta);
+    Serial.print(",");
     
     
-    Serial.print(", PosX: ");
+    Serial.print("PosX: ");
     Serial.print(Pose_X);
-    Serial.print(", PosY: ");
+    Serial.print(",");
+    Serial.print("PosY: ");
     Serial.print(Pose_Y);
-    Serial.print(", Pos_Theta: ");
+    Serial.print(",");
+    Serial.print("Pos_Theta: ");
     Serial.print(round(Pose_Theta*180/pi));
     Serial.println("");
 
