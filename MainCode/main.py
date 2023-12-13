@@ -19,8 +19,10 @@ if __name__ == '__main__':
     RPMA = 0
     RPMB = 0
 
+    running = True
+
     try:
-        while True:
+        while running:
             # hay que convertir a metros
             msg = f"{tracker.x},{tracker.y}"
             coms.comunicacion(msg)
@@ -32,4 +34,7 @@ if __name__ == '__main__':
     
     except KeyboardInterrupt:
         print("Data collection interrupted.")
+        running = False
         coms.close()
+        tracker.stop_tracking()
+        t1.join()

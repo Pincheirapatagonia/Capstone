@@ -35,6 +35,7 @@ class NutsTracker:
         self.detect = 0
         self.objX = resolution[0]/2
         self.objY = resolution[1]
+        self.xylock = threading.Lock()
 
     
     def initiateVideo(self):
@@ -72,9 +73,9 @@ class NutsTracker:
                 contornos, _ = cv2.findContours(
                     mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                 )
-                a = 0
                 detectIt = 0
                 min_dist = 10000000000000000000000000000
+                a = 0
                 x_candidate = None
                 y_candidate = None
                 for c in contornos:
@@ -92,8 +93,10 @@ class NutsTracker:
                             min_dist = dist
                             x_candidate = x
                             y_candidate = y
-                self.x = x_candidate
-                self.y = y_candidate
+                with self.xylock:
+                    if a:
+                        self.x = x_candidate
+                        self.y = y_candidate
                 cv2.circle(self.frame, (self.x, self.y), 7, (255, 0, 255), -1)
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 cv2.putText(self.frame, '{},{}'.format(
