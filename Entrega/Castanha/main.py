@@ -15,7 +15,8 @@ if __name__ == '__main__':
     coms = Communication()
     coms.begin()
     print("Coms Started!")
-    control = PID(4, 0.03, 0.1, 250, 0.03, 0.1,round(tracker.x_max/2), round(tracker.y_max)*2/3) # K_Lineal(P,I,D), K_theta(P,I,D)
+    print(tracker.x_max)
+    control = PID(4, 0.03, 0.1, 250, 0.05, 0.1,round(tracker.x_max/2), round(tracker.y_max)*4/5) # K_Lineal(P,I,D), K_theta(P,I,D)
     print("Control Started!")
     try:
         while True:

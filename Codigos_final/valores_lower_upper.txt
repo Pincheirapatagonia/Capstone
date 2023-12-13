@@ -1,4 +1,4 @@
-Lower: [25,18,148]
-Upper: [91,120,298]
+Lower: [29,43,161]
+Upper: [91,255,255]
 minArea: 428
-maxArea: 3262
+maxArea: 1554

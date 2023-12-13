@@ -17,7 +17,7 @@ class PID:
         self.x_target = x_target
         self.y_target = y_target
         self.tolangle = 7.5
-        self.tolpixels = 50
+        self.tolpixels = 100
         self.errA = 0
         self.errB = 0
 
@@ -44,7 +44,9 @@ class PID:
         #PID para lineal y angular separados con distintos kp, ki y kd
         
         # Error lineal
-        if self.theta_err == 0 or (abs(x-self.x_target) < self.tolpixels):
+        print(f"x: {x}")
+        print(f"x_target: {self.x_target}")
+        if self.theta_err == 0 or ((x>(self.x_target-self.tolpixels)) and (x < (self.x_target+self.tolpixels))):#(abs(x-self.x_target) < self.tolpixels)
             self.integral_angularA = 0
             self.integral_angularB = 0
             self.errA = self.lineal_err/2
@@ -54,7 +56,7 @@ class PID:
             outputB = self.kp * self.errA + self.ki * self.integral_lineal + self.kd * derivativeA #Copiamos A = B
             self.previous_error = self.errA
             # Limitar la salida
-            outputA = max(outputA, 130)
+            outputA = max(outputA, 128)
             outputB = max(outputB, 120)
 
         # Error angular
@@ -84,14 +86,14 @@ class PID:
                 outputB = outputB * 4/3
             # Limitar la salida
             if outputA > 0:
-                outputA = min(outputA, 255)
-                outputA = max(outputA, 110)
+                outputA = min(outputA, 200)
+                outputA = max(outputA, 105)
             elif outputA < 0:
                 outputA = max(outputA, -255)
                 outputA = min(outputA, -80)
             if outputB < 0:
-                outputB = max(outputB, -255)
-                outputB = min(outputB, -100)
+                outputB = max(outputB, -200)
+                outputB = min(outputB, -95)
             elif outputB > 0:
                 outputB = min(outputB, 255)
                 outputB = max(outputB, 100)

@@ -177,8 +177,8 @@ try:
         if not paused:
             ret, frame = cap.read()
         if ret == True:
-            #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            #frame = apply_median_filter(frame, kernel_size=3)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = apply_median_filter(frame, kernel_size=3)
             frameHSV = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
             mask = cv2.inRange(frameHSV, lower, upper)
             contornos, _ = cv2.findContours(
