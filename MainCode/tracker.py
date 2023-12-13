@@ -75,6 +75,8 @@ class NutsTracker:
                 a = 0
                 detectIt = 0
                 min_dist = 10000000000000000000000000000
+                x_candidate = None
+                y_candidate = None
                 for c in contornos:
                     area = cv2.contourArea(c)
                     if (area >= self.min_area) and (self.max_area >= area):
@@ -88,19 +90,21 @@ class NutsTracker:
                         dist = (x - self.obj[0])**2 + (y - self.obj[1])**2
                         if(dist < min_dist):
                             min_dist = dist
-                            self.x = x
-                            self.y = y
-                            cv2.circle(self.frame, (self.x, self.y), 7, (255, 0, 255), -1)
-                            font = cv2.FONT_HERSHEY_SIMPLEX
-                            cv2.putText(self.frame, '{},{}'.format(
-                                self.x, self.y), (self.x+10, self.y), font, 0.75, (255, 0, 255), 1, cv2.LINE_AA)
-                            nuevoContorno = cv2.convexHull(c)
-                            cv2.circle(self.frame, (self.x, self.y), max(
-                                nuevoContorno[:, 0, 0].tolist()) - self.x, (0, 0, 255), 2)
+                            x_candidate = x
+                            y_candidate = y
+                self.x = x_candidate
+                self.y = y_candidate
+                cv2.circle(self.frame, (self.x, self.y), 7, (255, 0, 255), -1)
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(self.frame, '{},{}'.format(
+                    self.x, self.y), (self.x+10, self.y), font, 0.75, (255, 0, 255), 1, cv2.LINE_AA)
+                nuevoContorno = cv2.convexHull(c)
+                cv2.circle(self.frame, (self.x, self.y), max(
+                    nuevoContorno[:, 0, 0].tolist()) - self.x, (0, 0, 255), 2)
 
-                            if self.mostrar_contorno:
-                                cv2.drawContours(
-                                    self.frame, [nuevoContorno], 0, (0, 255, 0), 3)
+                if self.mostrar_contorno:
+                    cv2.drawContours(
+                        self.frame, [nuevoContorno], 0, (0, 255, 0), 3)
                         # print(f"Distancia con respecto al centro de la imagen: {x - frame.shape[1] * 0.5}")}
                 print(f"detectIt: {detectIt}")
                 self.detect = a
