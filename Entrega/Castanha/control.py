@@ -21,6 +21,24 @@ class PID:
         self.errA = 0
         self.errB = 0
 
+
+    def truncated_cone_volume(r1, r2, h):
+        return (1/3) * math.pi * h * (r1**2 + r2**2 + r1*r2)
+    def bordes(self, x, y, x_target, y_target, tolpixels):
+        for i in range(num_points):
+        # calculate the angle and height for this point
+        angle = 2 * np.pi * i / num_points
+        
+
+        
+
+        # calculate the x, y, and z coordinates
+        x = radius * np.cos(angle)
+        y = radius * np.sin(angle)
+        z = height
+
+        # add this point to the list
+        points.append((x, y, z))
     def theta_error(self, x, y):
         # Returns the error in the angle theta
         if(self.y_target - y) == 0:
