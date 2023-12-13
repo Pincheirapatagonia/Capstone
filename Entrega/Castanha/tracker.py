@@ -29,9 +29,9 @@ class NutsTracker:
         self.detect = 0
         self.obj = [0, 0]
         self.min_area = 600
-        self.max_area = 14598
-        self.default_lower = np.array([7,40,164])
-        self.default_upper = np.array([110, 173, 255])
+        self.max_area = 10000
+        self.default_lower = np.array([25,18,148])
+        self.default_upper = np.array([91,120,298])
         self.detect = 0
         self.objX = resolution[0]/2
         self.objY = resolution[1]
@@ -92,6 +92,7 @@ class NutsTracker:
                             min_dist = dist
                             x_candidate = x
                             y_candidate = y
+                self.detect = a
                 self.x = x_candidate
                 self.y = y_candidate
                 cv2.circle(self.frame, (self.x, self.y), 7, (255, 0, 255), -1)
@@ -107,7 +108,6 @@ class NutsTracker:
                         self.frame, [nuevoContorno], 0, (0, 255, 0), 3)
                         # print(f"Distancia con respecto al centro de la imagen: {x - frame.shape[1] * 0.5}")}
                 print(f"detectIt: {detectIt}")
-                self.detect = a
                 if a == 0:
                     self.x  = self.objX
                     self.y = self.objY
