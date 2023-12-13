@@ -246,10 +246,6 @@ void setup() {
     delay(10);
   }
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-
   pinMode(AC1, INPUT_PULLUP);
   pinMode(AC2, INPUT_PULLUP);
   pinMode(BC1, INPUT_PULLUP);
@@ -265,9 +261,6 @@ void setup() {
   state_pid_pose = 0;
 }
 void loop() {
-  //sensors_event_t a, g, temp;
-  //mpu.getEvent(&a, &g, &temp);
-  //Theta = (g.gyro.z * dt) / 1000 + Theta_old;
   if ((millis() - t_prev)>= 100) {
     t = millis();
     ThetaA = EncoderCountA; 
