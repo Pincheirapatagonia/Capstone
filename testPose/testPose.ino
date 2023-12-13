@@ -58,7 +58,6 @@ int PWM_MAX = 255;
 int PWM_MIN = 50;
 
 
-
 // ************ VARIABES PID POSE************
 float Pose_X, Pose_Y, Pose_Theta;
 float Vel_X, Vel_Y, Vel_Theta;
@@ -322,7 +321,9 @@ void loop() {
     inte_prev_B = inte_B;
     
 
-
+    Serial.print("t:");
+    Serial.print(",");
+    Serial.print(t/1000);
     Serial.print("VelX:");
     Serial.print(",");
     Serial.print(Vel_X);

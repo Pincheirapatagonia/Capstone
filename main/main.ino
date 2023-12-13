@@ -64,7 +64,6 @@ float Pose_X_final = 0.1;
 float Pose_Y_final = 0;
 float Pose_Theta_final = 0;
 
-int state_pid_pose = 0;
 float kp_giro = 1;
 float ki_giro = 0.0;
 float kp_desp = 0.05;
@@ -73,6 +72,7 @@ float e_giro_margin = 0.09;  // approx 5°
 float e_giro_margin_factor = 1.1;
 float e_desp_margin = 0.025;
 
+int state_pid_pose = 0;
 float e_giro, e_prev_giro, inte_giro, inte_prev_giro;
 float Vel_Rot_ref, RPM_Rot_ref;
 float e_desp, e_prev_desp, inte_desp, inte_prev_desp;
@@ -85,7 +85,8 @@ float enc_vel_A, enc_vel_B, enc_RPM_A, enc_RPM_B;
 
 // ************ TIEMPO************
 int dt;
-unsigned long t, t_prev;
+unsigned long t_init, t, t_prev;
+
 
 
 char msg[60];
@@ -110,36 +111,43 @@ int agarro_castana = 0;
 int scooping = 0;
 
 
-void WriteDriverVoltageA(int PWM_val) {
-  if (PWM_val > 0) {
-    digitalWrite(AIN1, HIGH);
-    digitalWrite(AIN2, LOW);
-  } else if (PWM_val < 0) {
-    digitalWrite(AIN1, LOW);
-    digitalWrite(AIN2, HIGH);
-  } else {
-    digitalWrite(AIN1, LOW);
-    digitalWrite(AIN2, LOW);
-  }
-  analogWrite(ENA, abs(PWM_val));
+void WriteDriverVoltageA(int PWM_val){
+    if (PWM_val > 0){
+        digitalWrite(AIN1, HIGH);
+        digitalWrite(AIN2, LOW);
+    }
+    else if (PWM_val < 0){
+        digitalWrite(AIN1, LOW);
+        digitalWrite(AIN2, HIGH);
+    }
+    else{
+        digitalWrite(AIN1, LOW);
+        digitalWrite(AIN2, LOW);
+    }
+    if (abs(PWM_val) > PWM_MAX) PWM_val = PWM_MAX;
+    if (abs(PWM_val) < PWM_MIN) PWM_val= PWM_MIN;
+    analogWrite(ENA, abs(PWM_val));
 }
-void WriteDriverVoltageB(int PWM_val) {
-  if (PWM_val < 0) {
-    digitalWrite(BIN1, HIGH);
-    digitalWrite(BIN2, LOW);
-  } else if (PWM_val > 0) {
-    digitalWrite(BIN1, LOW);
-    digitalWrite(BIN2, HIGH);
-  } else {
-    digitalWrite(BIN1, LOW);
-    digitalWrite(BIN2, LOW);
-  }
-  analogWrite(ENB, abs(PWM_val));
+void WriteDriverVoltageB(int PWM_val){
+    if (PWM_val < 0){
+        digitalWrite(BIN1, HIGH);
+        digitalWrite(BIN2, LOW);
+    }
+    else if (PWM_val > 0){
+        digitalWrite(BIN1, LOW);
+        digitalWrite(BIN2, HIGH);
+    }
+    else{
+        digitalWrite(BIN1, LOW);
+        digitalWrite(BIN2, LOW);
+    }
+    if (abs(PWM_val) > PWM_MAX) PWM_val = PWM_MAX;
+    if (abs(PWM_val) < PWM_MIN) PWM_val= PWM_MIN;
+    analogWrite(ENB, abs(PWM_val));
 }
 void ISR_EncoderA2() {
   bool PinB = digitalRead(AC2);
   bool PinA = digitalRead(AC1);
-
   if (PinB == LOW) {
     if (PinA == HIGH) {
       EncoderCountA++;
@@ -223,7 +231,10 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  t_init = millis();
+  t_prev = t_init;
 }
+
 void loop() {
   if ((millis() - t_prev) >= 100) {
     t = millis();
@@ -299,7 +310,8 @@ void loop() {
         }
       }
     } else if (state_pid_pose == 2) {  // 2: girando para llegar
-      e_giro = Pose_Theta_final - Pose_Theta;
+      Pose_Theta_ref = Pose_Theta_final;
+      e_giro = Pose_Theta_ref - Pose_Theta;
       if (e_giro < e_giro_margin) {
         state_pid_pose = 3;
       } else {
@@ -330,15 +342,27 @@ void loop() {
     inte_prev_A = inte_A;
     inte_prev_B = inte_B;
 
-    if(kp_A >=  3){
+    // if(kp_A >=  3){
+    //   WriteDriverVoltageA(0);
+    //   WriteDriverVoltageB(0);
+    // } else{
+    //   WriteDriverVoltageA(PWM_A_val);
+    //   WriteDriverVoltageB(PWM_B_val);
+    // }
+    if (t<6000){
+      WriteDriverVoltageA(150);
+      WriteDriverVoltageB(150);
+    }
+    else{
       WriteDriverVoltageA(0);
       WriteDriverVoltageB(0);
-    } else{
-      WriteDriverVoltageA(PWM_A_val);
-      WriteDriverVoltageB(PWM_B_val);
     }
+    
 
     //---------------PRINTS------------------
+    Serial.print("t:");
+    Serial.print((t - t_init)/10);
+    Serial.print(",");
     // Serial.print("PosX:");
     // Serial.print(Pose_X);
     // Serial.print(",");
@@ -358,21 +382,21 @@ void loop() {
     // Serial.print(Vel_Theta);
     // Serial.print(",");
 
-    Serial.print("Kp:");
-    Serial.print(kp_A);
-    Serial.print(",");
+    // Serial.print("Kp:");
+    // Serial.print(kp_A);
+    // Serial.print(",");
     Serial.print("RPMA:");
     Serial.print(RPM_A);
     Serial.print(",");
     Serial.print("RPMB:");
     Serial.print(RPM_B);
     Serial.print(",");
-    Serial.print("RPMA_REF:");
-    Serial.print(RPM_A_ref);
-    Serial.print(",");
-    Serial.print("RPMB_REF:");
-    Serial.print(RPM_B_ref);
-    Serial.print(",");
+    // Serial.print("RPMA_REF:");
+    // Serial.print(RPM_A_ref);
+    // Serial.print(",");
+    // Serial.print("RPMB_REF:");
+    // Serial.print(RPM_B_ref);
+    // Serial.print(",");
 
     // Serial.print("DESP_REF:");
     // Serial.print(",");
@@ -381,6 +405,13 @@ void loop() {
     // Serial.print(",");
     // Serial.print(e_desp);
 
+
+    // Serial.print("Theta_REF:");
+    // Serial.print(Pose_Theta_ref);
+    // Serial.print(",");
+    // Serial.print("Pose_Theta:");
+    // Serial.print(Pose_Theta);
+    // Serial.print(",")
 
 
 
