@@ -4,6 +4,8 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 
+
+#define MPU6050_DEVICE_ID 0x2
 Adafruit_MPU6050 mpu;
 
 float theta = 0.0;
@@ -12,7 +14,7 @@ int t  = 0;
 int t_old = 0;
 float dt;
 void setup(void) {
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial) {
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
   }

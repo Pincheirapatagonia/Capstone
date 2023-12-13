@@ -1,4 +1,10 @@
 #include <Servo.h> //Imports the library Servo
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+Adafruit_MPU6050 mpu;
+
 //GeeKee CeeBee
 #define trigPin 3 // TriggerSensor
 #define echoPin 2 // EchoSensor
@@ -7,7 +13,7 @@
 #define MAXANG 180 // Servo máx angle
 #define MINANG 0 // Servo min angle
 #define SCOOPDELAY 5
-
+#define MPU6050_DEVICE_ID 0x98
 #define ENA 6
 #define ENB 11
 
@@ -28,7 +34,7 @@
 Servo servo; //Defines the object Servo of type(class) Servo
 int angle = 0; // Defines an integer
 
-
+float Theta_old = 0.0;
 // ************ DEFINITIONS A (L)************
 volatile long EncoderCountA = 0;
 float ThetaA, ThetaA_prev;
@@ -60,7 +66,7 @@ int RPM_A_ref, RPM_B_ref;
 float Pose_X, Pose_Y, Pose_Theta, Pose_Theta_ref;
 float Pose_X_final = 0;
 float Pose_Y_final = 0;
-float Pose_Theta_final = pi/2;
+float Pose_Theta_final = 3*pi/2;
 int state_pid_pose = 0;
 
 // ************ VARIABES PID ROT************
@@ -80,7 +86,8 @@ float e_desp_margin = 0.05;
 
 
 // ************ ODOMETRIA************
-float Pos_x, Pos_y, Theta;
+float Pos_x, Pos_y;
+float Theta = 0.0;
 float Vel_ang, Vel_lin, Vel_x, Vel_y;
 
 // ************ TIEMPO************
@@ -236,6 +243,23 @@ int sign(int x) {
 
 void setup() {
   Serial.begin(baud);
+  while (!Serial) {
+    delay(10);
+  }
+
+  if (!mpu.begin())
+  {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1)
+    {
+      delay(10);
+    }
+  }
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
   pinMode(AC1, INPUT_PULLUP);
   pinMode(AC2, INPUT_PULLUP);
   pinMode(BC1, INPUT_PULLUP);
@@ -251,47 +275,61 @@ void setup() {
   state_pid_pose = 0;
 }
 void loop() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  Theta = (g.gyro.z * dt) / 1000 + Theta_old;
   if ((millis() - t_prev)>= 100) {
-      t = millis();
-      ThetaA = EncoderCountA;
-      ThetaB = EncoderCountB;
-      Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas;
-      Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas;
-      dt = t - t_prev;
-      RPM_A = 1000 * (ThetaA - ThetaA_prev)/ dt * 60.0 / NFactor;
-      RPM_B = 1000 * (ThetaB - ThetaB_prev)/ dt * 60.0 / NFactor;
-      vel_A = RPM_A * pi * 2 / 60.0;  // [rad/s]
-      vel_B = RPM_B * pi * 2 / 60.0;  // [rad/s]
-      Vel_ang = R_ruedas * (vel_B - vel_A) / L_robot;  // [rad/s]
-      Theta = Theta + Vel_ang*dt/1000;  // [rad]
-      Vel_lin = R_ruedas * (vel_A + vel_B) / 2; // [m/s]
-      Vel_x = Vel_lin * cos(Theta); // [m/s]
-      Vel_y = Vel_lin * sin(Theta); // [m/s]
-      Pos_x = Pos_x + (Vel_x*dt)/1000; // [m]
-      Pos_y = Pos_y + (Vel_y*dt)/1000; // [m]
+    t = millis();
+    ThetaA = EncoderCountA; 
+    ThetaB = EncoderCountB;
+    Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas;
+    Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas;
+    dt = t - t_prev;
+    RPM_A = 1000 * (ThetaA - ThetaA_prev) / dt * 60.0 / NFactor;
+    RPM_B = 1000 * (ThetaB - ThetaB_prev) / dt * 60.0 / NFactor;
+    vel_A = RPM_A * pi * 2 / 60.0;                  // [rad/s]
+    vel_B = RPM_B * pi * 2 / 60.0;                  // [rad/s]
+    Vel_ang = R_ruedas * (vel_B - vel_A) / L_robot; // [rad/s]
 
-      Pose_X = Pos_x;
-      Pose_Y = Pos_y;
-      Pose_Theta = Theta;
+    //---------------MODIFICACION------------------
+    
+    //Theta = Theta + Vel_ang * dt / 1000; // [rad] //--------------------------Reemplazo theta por el giroscopio
 
-      e_desp = sqrt((Pose_X_final - Pose_X)*(Pose_X_final - Pose_X) + (Pose_Y_final - Pose_Y)*(Pose_Y_final - Pose_Y));
-      if (state_pid_pose == 0){// 0: girando para alinear
-          Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
-          e_giro = Pose_Theta_ref - Pose_Theta;
-          if (abs(e_giro) < e_giro_margin){
-              state_pid_pose = 1;
-              e_prev_giro = 0;
-              inte_prev_giro = 0;
-              Serial.println("CAMGIO A 1");
-          } else {
-              inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
-              Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
-              RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2*pi); //
-              RPM_A_ref = -RPM_Rot_ref; 
-              RPM_B_ref = RPM_Rot_ref; 
-              e_prev_giro = e_giro;
-              inte_prev_giro = inte_giro;
-          }
+    //Theta = (g.gyro.z * dt) / 1000 + theta_old;
+    //---------Néstor, imprime Rpi 4----------------
+
+    Vel_lin = R_ruedas * (vel_A + vel_B) / 2; // [m/s]
+    Vel_x = Vel_lin * cos(Theta);             // [m/s]
+    Vel_y = Vel_lin * sin(Theta);             // [m/s]
+    Pos_x = Pos_x + (Vel_x * dt) / 1000;      // [m]
+    Pos_y = Pos_y + (Vel_y * dt) / 1000;      // [m]
+
+    Pose_X = Pos_x;
+    Pose_Y = Pos_y;
+    Pose_Theta = Theta;
+
+    e_desp = sqrt((Pose_X_final - Pose_X) * (Pose_X_final - Pose_X) + (Pose_Y_final - Pose_Y) * (Pose_Y_final - Pose_Y));
+    if (state_pid_pose == 0)
+    { // 0: girando para alinear
+      Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
+      e_giro = Pose_Theta_ref - Pose_Theta;
+      if (abs(e_giro) < e_giro_margin)
+      {
+        state_pid_pose = 1;
+        e_prev_giro = 0;
+        inte_prev_giro = 0;
+        Serial.println("CAMGIO A 1");
+      }
+      else
+      {
+        inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
+        Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
+        RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2 * pi);     //
+        RPM_A_ref = -RPM_Rot_ref;
+        RPM_B_ref = RPM_Rot_ref;
+        e_prev_giro = e_giro;
+        inte_prev_giro = inte_giro;
+      }
       }
       
       else if (state_pid_pose == 1){ // 1: aavanzado apra llegara
@@ -383,6 +421,7 @@ void loop() {
 
       ThetaA_prev = ThetaA;
       ThetaB_prev = ThetaB;
+      Theta_old = Theta;
       t_prev = t;
   }
 }
