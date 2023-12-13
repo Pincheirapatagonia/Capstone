@@ -13,7 +13,6 @@ Adafruit_MPU6050 mpu;
 #define MAXANG 180 // Servo máx angle
 #define MINANG 0 // Servo min angle
 #define SCOOPDELAY 5
-#define MPU6050_DEVICE_ID 0x98
 #define ENA 6
 #define ENB 11
 
@@ -64,9 +63,9 @@ int RPM_A_ref, RPM_B_ref;
 
 // ************ VARIABES PID POSE************
 float Pose_X, Pose_Y, Pose_Theta, Pose_Theta_ref;
-float Pose_X_final = 0;
+float Pose_X_final = 1;
 float Pose_Y_final = 0;
-float Pose_Theta_final = 3*pi/2;
+float Pose_Theta_final = 0;
 int state_pid_pose = 0;
 
 // ************ VARIABES PID ROT************
@@ -74,7 +73,7 @@ float kp_giro = 1;
 float ki_giro = 0.1;
 float e_giro, e_prev_giro, inte_giro, inte_prev_giro;
 float Vel_Rot_ref, RPM_Rot_ref;
-float e_giro_margin = 0.01;
+float e_giro_margin = 10;
 float e_giro_margin_factor = 1.1;
 
 // ************ VARIABES PID DESP************
@@ -247,15 +246,6 @@ void setup() {
     delay(10);
   }
 
-  if (!mpu.begin())
-  {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1)
-    {
-      delay(10);
-    }
-  }
-
   mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
@@ -275,9 +265,9 @@ void setup() {
   state_pid_pose = 0;
 }
 void loop() {
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  Theta = (g.gyro.z * dt) / 1000 + Theta_old;
+  //sensors_event_t a, g, temp;
+  //mpu.getEvent(&a, &g, &temp);
+  //Theta = (g.gyro.z * dt) / 1000 + Theta_old;
   if ((millis() - t_prev)>= 100) {
     t = millis();
     ThetaA = EncoderCountA; 
@@ -293,7 +283,7 @@ void loop() {
 
     //---------------MODIFICACION------------------
     
-    //Theta = Theta + Vel_ang * dt / 1000; // [rad] //--------------------------Reemplazo theta por el giroscopio
+    Theta = Theta + Vel_ang * dt / 1000; // [rad] //--------------------------Reemplazo theta por el giroscopio
 
     //Theta = (g.gyro.z * dt) / 1000 + theta_old;
     //---------Néstor, imprime Rpi 4----------------
@@ -338,7 +328,6 @@ void loop() {
           if (abs(e_giro) > e_giro_margin*e_giro_margin_factor){
               state_pid_pose = 0;
           } else {
-          
               if (e_desp < e_desp_margin){
                   state_pid_pose = 2;
                   e_prev_desp = 0;
@@ -406,16 +395,16 @@ void loop() {
       //Serial.print(" PWMB:");
       //Serial.print(PWM_B_val);
 
-      Serial.print(" Egiro:");
+      Serial.print(", Egiro: ");
       Serial.print(e_giro);
-      Serial.print(" Edesp:");
+      Serial.print(", Edesp: ");
       Serial.print(e_desp);
       
-      Serial.print(" PosX");
+      Serial.print(", PosX: ");
       Serial.print(Pose_X);
-      Serial.print(" PosY");
+      Serial.print(", PosY: ");
       Serial.print(Pose_Y);
-      Serial.print(" Pos_Theta");
+      Serial.print(", Pos_Theta: ");
       Serial.print(round(Pose_Theta*180/pi));
       Serial.println("");
 

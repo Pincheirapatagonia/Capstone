@@ -71,7 +71,7 @@ int distance;
 
 unsigned long startScoop = 0;
 unsigned long currentMillis = 0;
-unsigned long lastScoopMillestone = 0;'
+unsigned long lastScoopMillestone = 0;
 unsigned long lastUS;
 
 int agarro_castana = 0;
