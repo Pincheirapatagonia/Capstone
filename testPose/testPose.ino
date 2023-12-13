@@ -21,10 +21,7 @@ Adafruit_MPU6050 mpu;
 #define BIN1 10
 #define BIN2 9
 
-#define AC1 21
-#define AC2 20
-#define BC1 19
-#define BC2 18
+
 
 #define baud 9600
 
@@ -158,74 +155,6 @@ void WriteDriverVoltageB(int PWM_val){
     if (abs(PWM_val) < PWM_MIN) PWM_val= PWM_MIN;
     analogWrite(ENB, abs(PWM_val));
 }
-void ISR_EncoderA2() {
-  bool PinB = digitalRead(AC2);
-  bool PinA = digitalRead(AC1);
-  if (PinB == LOW) {
-    if (PinA == HIGH) {
-      EncoderCountA++;
-    } else {
-      EncoderCountA--;
-    }
-  } else {
-    if (PinA == HIGH) {
-      EncoderCountA--;
-    } else {
-      EncoderCountA++;
-    }
-  }
-}
-void ISR_EncoderA1() {
-  bool PinB = digitalRead(AC2);
-  bool PinA = digitalRead(AC1);
-  if (PinA == LOW) {
-    if (PinB == HIGH) {
-      EncoderCountA--;
-    } else {
-      EncoderCountA++;
-    }
-  } else {
-    if (PinB == HIGH) {
-      EncoderCountA++;
-    } else {
-      EncoderCountA--;
-    }
-  }
-}
-void ISR_EncoderB2() {
-  bool PinB = digitalRead(BC2);
-  bool PinA = digitalRead(BC1);
-  if (PinA == LOW) {
-    if (PinB == HIGH) {
-      EncoderCountB++;
-    } else {
-      EncoderCountB--;
-    }
-  } else {
-    if (PinB == HIGH) {
-      EncoderCountB--;
-    } else {
-      EncoderCountB++;
-    }
-  }
-}
-void ISR_EncoderB1() {
-  bool PinB = digitalRead(BC2);
-  bool PinA = digitalRead(BC1);
-  if (PinA == LOW) {
-    if (PinB == HIGH) {
-      EncoderCountB--;
-    } else {
-      EncoderCountB++;
-    }
-  } else {
-    if (PinB == HIGH) {
-      EncoderCountB++;
-    } else {
-      EncoderCountB--;
-    }
-  }
-}
 
 
 void setup() {
@@ -234,18 +163,19 @@ void setup() {
     delay(10);
   }
 
+
+    // Try to initialize!
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) {
+      delay(10);
+    }
+  }
   mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
-  pinMode(AC1, INPUT_PULLUP);
-  pinMode(AC2, INPUT_PULLUP);
-  pinMode(BC1, INPUT_PULLUP);
-  pinMode(BC2, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(AC1), ISR_EncoderA1, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(AC2), ISR_EncoderA2, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BC1), ISR_EncoderB1, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BC2), ISR_EncoderB2, CHANGE);
+
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
@@ -415,9 +345,9 @@ void loop() {
     //Serial.print(e_desp);
 
     Serial.print(", VelX: ");
-    Serial.print(Vel_X);
+    Serial.print(mpu_x_vel);
     Serial.print(", VelY: ");
-    Serial.print(Vel_Y);
+    Serial.print(mpu_y_vel));
     Serial.print(", VelTheta: ");
     Serial.print(Vel_Theta);
     
