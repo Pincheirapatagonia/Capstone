@@ -1,6 +1,8 @@
 #include <Servo.h> //Imports the library Servo
+#include <HCSR04.h>
+
 //GeeKee CeeBee
-#define trigPin 3 // TriggerSensor
+#define trigPin 7 // TriggerSensor
 #define echoPin 2 // EchoSensor
 
 #define ServoPin 38 // Servo pin
@@ -21,9 +23,11 @@
 #define BC1 19 // D7
 #define BC2 18 // D8
 
+
 #define baud 115200
 
 #define pi 3.1415
+
 
 Servo servo; //Defines the object Servo of type(class) Servo
 int angle = 0; // Defines an integer
@@ -67,57 +71,55 @@ int distance;
 
 unsigned long startScoop = 0;
 unsigned long currentMillis = 0;
+unsigned long lastScoopMillestone = 0;'
+unsigned long lastUS;
 
 int agarro_castana = 0;
 int scooping = 0;
 
-
-byte buffer[3];
-void checkDistance()
-{
-    // Clear the trigPin by setting it LOW:
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(5);
-
-  // Trigger the sensor by setting the trigPin high for 10 microseconds:
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  // Read the echoPin, pulseIn() returns the duration (length of the pulse) in microseconds:
-  duration = pulseIn(echoPin, HIGH);
-  // Calculate the distance:
-  distance = duration * 0.034 / 2;
-
-  // Print the distance on the Serial Monitor (Ctrl+Shift+M):
-}
+HCSR04 hc(trigPin, echoPin);
 
 void scoop() {
-    // The following loop runs until the servo is turned to 180 degrees
-    // Serial.println("scooping");
-    if(scooping == 1){
-      currentMillis = millis();
-      if (currentMillis - startScoop >= SCOOPDELAY) {
-          angle++;
-          servo.write(angle);
-          startScoop = currentMillis;
-      }
-      if(angle >= MAXANG){
-        scooping = 2;
-      }
+  // The following loop runs until the servo is turned to 180 degrees
+  // Serial.println("scooping");
+  currentMillis = millis();
+  if(scooping == 1){
+    if (currentMillis - lastScoopMillestone >= SCOOPDELAY) {
+        angle++;
+        servo.write(angle);
+        lastScoopMillestone = currentMillis;
     }
-    if(scooping == 2){
-      currentMillis = millis();
-      if (currentMillis - startScoop >= SCOOPDELAY) {
-          angle--;
-          servo.write(angle);
-          startScoop = currentMillis;
-      }
-      if(angle <= MINANG){
-        scooping = 3;
-      }
+    if(angle >= MAXANG){
+      scooping = 2;
+      lastScoopMillestone = currentMillis;
     }
+  }
+  if(scooping == 2){
+    if (currentMillis - lastScoopMillestone >= 500) {
+      scooping = 3;
+      lastScoopMillestone = currentMillis;
+    }
+  }
+  if(scooping == 3){
+    currentMillis = millis();
+    if (currentMillis - lastScoopMillestone >= SCOOPDELAY) {
+        angle--;
+        servo.write(angle);
+        lastScoopMillestone = currentMillis;
+    }
+    if(angle <= MINANG){
+      scooping = 4;
+      lastScoopMillestone = currentMillis;
+    }
+  }
+  if(scooping == 4){
+    if (currentMillis - lastScoopMillestone >= 2000) {
+      distance = 12;
+      scooping = 0;
+    }
+  }
 }
+
 
 int sign(int x) {
   if (x > 0) {
@@ -285,7 +287,24 @@ void setup() {
 }
 
 void loop() {
-  readSerialPort();
+  if (Serial.available() > 0)
+  {
+      String data = Serial.readStringUntil('\n');
+      Serial.print("You sent me: ");
+
+      // Convert the string values to integers
+      PWM_A_val = getValue(data, ',', 0).toInt();
+      PWM_B_val = getValue(data, ',', 1).toInt();
+      Serial.print(PWM_A_val);
+      Serial.print(',');
+      Serial.println(PWM_B_val);
+  }
+  else{
+    if(millis() - lastUS > 100){
+      distance = hc.dist();
+      lastUS = millis();
+    }
+  }
   if(scooping == 0){
     if(distance < 9){
       distance = 12;
