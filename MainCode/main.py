@@ -1,24 +1,28 @@
 from comunication import Communication
 from control import PID
 from tracker import NutsTracker
+from threading import Thread
 
 
 if __name__ == '__main__':
     print("Starting...")
     print("Video Started!")
+    tracker = NutsTracker()
+    tracker.initiateVideo()
+    t1 = Thread(target = tracker.track)
+    t1.start()
+
     coms = Communication()
     coms.begin()
     print("Coms Started!")
 
     RPMA = 0
     RPMB = 0
-    posX = 0
+
     try:
         while True:
-            if(int(round(float(posX))) < 1):
-                msg = "90,90\n"
-            else:
-                msg = "0,0\n" 
+            # hay que convertir a metros
+            msg = f"{tracker.x},{tracker.y}"
             coms.comunicacion(msg)
             coms.read_and_print_messages()
             if(coms.data != ""):
