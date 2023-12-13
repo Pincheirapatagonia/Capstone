@@ -85,16 +85,16 @@ class PID:
             # Limitar la salida
             if outputA > 0:
                 outputA = min(outputA, 255)
-                outputA = max(outputA, 100)
+                outputA = max(outputA, 110)
             elif outputA < 0:
                 outputA = max(outputA, -255)
-                outputA = min(outputA, -70)
+                outputA = min(outputA, -80)
             if outputB < 0:
                 outputB = max(outputB, -255)
-                outputB = min(outputB, -100)
+                outputB = min(outputB, -110)
             elif outputB > 0:
                 outputB = min(outputB, 255)
-                outputB = max(outputB, 90)
+                outputB = max(outputB, 100)
         return int(round(outputA)), int(round(outputB))
 
 
