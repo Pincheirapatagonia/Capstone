@@ -39,9 +39,9 @@ volatile long EncoderCountA = 0;
 float ThetaA, ThetaA_prev;
 float Dist_A, vel_A, RPM_A;
 int PWM_A_val;
-float kp_A = 1.24;
+float kp_A = 1.3;
 float ki_A = 0.02;
-float kd_A = 10.8;
+float kd_A = 11;
 
 // ************ DEFINITIONS B (R)************
 volatile long EncoderCountB = 0;
@@ -77,8 +77,8 @@ float e_giro_margin = 10;
 float e_giro_margin_factor = 1.1;
 
 // ************ VARIABES PID DESP************
-float kp_desp = 0.05;
-float ki_desp = 1;
+float kp_desp = 1;
+float ki_desp = 0.0001;
 float e_desp, e_prev_desp, inte_desp, inte_prev_desp;
 float Vel_Desp_ref, RPM_Desp_ref;
 float e_desp_margin = 0.05;
@@ -130,7 +130,7 @@ void WriteDriverVoltageA(int PWM_val)
         digitalWrite(AIN1, LOW);
         digitalWrite(AIN2, LOW);
     }
-    analogWrite(ENA, abs(PWM_val));
+    analogWrite(ENA, min(abs(PWM_val),255));
 }
 void WriteDriverVoltageB(int PWM_val)
 {
@@ -146,7 +146,7 @@ void WriteDriverVoltageB(int PWM_val)
         digitalWrite(BIN1, LOW);
         digitalWrite(BIN2, LOW);
     }
-    analogWrite(ENB, abs(PWM_val));
+    analogWrite(ENB, min(abs(PWM_val),255));
 }
 
 void ISR_EncoderA2() {
@@ -337,6 +337,7 @@ void loop() {
                   inte_desp = inte_prev_desp + (dt * (e_desp + e_prev_desp) / 2);
                   Vel_Desp_ref = float(kp_desp * e_desp + ki_desp * inte_desp); // m/s
                   RPM_Desp_ref = Vel_Desp_ref * 60 / (2*pi);
+                  //Serial.println(RPM_Desp_ref);
                   RPM_A_ref = RPM_Desp_ref; 
                   RPM_B_ref = RPM_Desp_ref; 
                   e_prev_desp = e_desp;
@@ -379,8 +380,8 @@ void loop() {
       inte_prev_B = inte_B;
 
     
-      WriteDriverVoltageA(PWM_A_val);
-      WriteDriverVoltageB(PWM_B_val);
+      //WriteDriverVoltageA(PWM_A_val);
+      //WriteDriverVoltageB(PWM_B_val);
 
       Serial.print(t);
       Serial.print(", ");
