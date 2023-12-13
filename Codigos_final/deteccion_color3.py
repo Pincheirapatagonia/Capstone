@@ -42,7 +42,7 @@ def erode_and_dilate(mask, kernel_size=(5, 5), iterations=1):
 
 
 local = os.getcwd()
-target = [os.path.join(local, "Tests", "Vision")]
+target = [os.path.join(local,"Codigos_final")]
 os.chdir(target[0])
 
 mostrar_contorno = False
@@ -93,6 +93,8 @@ try:
             ': ')[1].replace('[', '').replace(']', '')
         upper_line = lines[1].strip().split(
             ': ')[1].replace('[', '').replace(']', '')
+        minContourArea = int(lines[2].strip().split(': ')[1])
+        maxContourArea = int(lines[3].strip().split(': ')[1])
 
         # Convierte los valores de string a numpy arrays
         lower = np.array([int(x) for x in lower_line.split(',')])
@@ -103,9 +105,11 @@ except FileNotFoundError:
     print('Archivo no encontrado, utilizando valores predeterminados')
     lower = np.array([49, 45, 0], np.uint8)
     upper = np.array([96, 255, 255], np.uint8)
+    minContourArea = 10000
+    maxContourArea = 100000
 
 # Replace camera capture with video file capture
-video_file_path = 'test_afuera.mp4'   # Change this to your video file path
+video_file_path = 'test.h264'   # Change this to your video file path
 cap = cv2.VideoCapture(video_file_path)
 
 ret, frame = cap.read()
@@ -113,8 +117,6 @@ cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('frame', 640, 480)
 cv2.moveWindow('frame', 30, 100)
 
-minContourArea = 10000
-maxContourArea = round(frame.shape[0]*frame.shape[1]/30)
 # Create trackbars for color change
 # Hue is from 0-179 for OpenCV
 cv2.createTrackbar('HMin', 'image', 0, 255, nothing)
@@ -123,10 +125,10 @@ cv2.createTrackbar('VMin', 'image', 0, 255, nothing)
 cv2.createTrackbar('HMax', 'image', 0, 255, nothing)
 cv2.createTrackbar('SMax', 'image', 0, 255, nothing)
 cv2.createTrackbar('VMax', 'image', 0, 255, nothing)
-cv2.createTrackbar('MinContourArea', 'image', minContourArea,
-                   maxContourArea, nothing)
+cv2.createTrackbar('MinContourArea', 'image', 1000,
+                   round(frame.shape[0]*frame.shape[1]/80), nothing)
 cv2.createTrackbar('MaxContourArea', 'image', minContourArea,
-                   maxContourArea, nothing)
+                   round(frame.shape[0]*frame.shape[1]/80), nothing)
 
 # Initialize HSV min/max values h49 s85
 hMin = sMin = vMin = hMax = sMax = vMax = 0
