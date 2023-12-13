@@ -17,7 +17,7 @@ class PID:
         self.x_target = x_target
         self.y_target = y_target
         self.tolangle = 7.5
-        self.tolpixels = 70
+        self.tolpixels = 50
         self.errA = 0
         self.errB = 0
 
@@ -54,7 +54,7 @@ class PID:
             outputB = self.kp * self.errA + self.ki * self.integral_lineal + self.kd * derivativeA #Copiamos A = B
             self.previous_error = self.errA
             # Limitar la salida
-            outputA = max(outputA, 120)
+            outputA = max(outputA, 130)
             outputB = max(outputB, 120)
 
         # Error angular
@@ -91,7 +91,7 @@ class PID:
                 outputA = min(outputA, -80)
             if outputB < 0:
                 outputB = max(outputB, -255)
-                outputB = min(outputB, -110)
+                outputB = min(outputB, -100)
             elif outputB > 0:
                 outputB = min(outputB, 255)
                 outputB = max(outputB, 100)

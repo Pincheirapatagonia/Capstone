@@ -28,7 +28,7 @@ class NutsTracker:
         self.y_max = resolution[1]
         self.detect = 0
         self.obj = [0, 0]
-        self.min_area = 600
+        self.min_area = 1000
         self.max_area = 10000
         self.default_lower = np.array([25,18,148])
         self.default_upper = np.array([91,120,298])
@@ -119,6 +119,19 @@ class NutsTracker:
                 if self.record:
                     #cv2.line(self.frame, (self.objX - 50, 0), (self.objX - 50, self.objY), (0, 0, 255), 2)
                     #cv2.line(self.frame, (self.objX + 50, 0), (self.objX + 50, self.objY), (0, 0, 255), 2)
+
+                    cv2.circle(self.frame, (self.x, self.y), 7, (255, 0, 255), -1)
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    cv2.putText(self.frame, '{},{}'.format(
+                        self.x, self.y), (self.x+10, self.y), font, 0.75, (255, 0, 255), 1, cv2.LINE_AA)
+                    nuevoContorno = cv2.convexHull(c)
+                    cv2.circle(self.frame, (self.x, self.y), max(
+                        nuevoContorno[:, 0, 0].tolist()) - self.x, (0, 0, 255), 2)
+
+                    if self.mostrar_contorno:
+                        cv2.drawContours(
+                            self.frame, [nuevoContorno], 0, (0, 255, 0), 3)
+                    # print(f"Distancia con respecto al centro de la imagen: {x - frame.shape[1] * 0.5}")}
                     self.outRaw.write(frameRGBMedian)
                     self.outMask.write(self.frame)
             
