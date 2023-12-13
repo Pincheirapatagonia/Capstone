@@ -1,68 +1,108 @@
 #include <Servo.h> //Imports the library Servo
-#include <HCSR04.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+Adafruit_MPU6050 mpu;
 
 //GeeKee CeeBee
-#define trigPin 7 // TriggerSensor
+#define trigPin 3 // TriggerSensor
 #define echoPin 2 // EchoSensor
 
-#define ServoPin 38 // Servo pin
+#define ServoPin 8 // Servo pin
 #define MAXANG 180 // Servo máx angle
 #define MINANG 0 // Servo min angle
 #define SCOOPDELAY 5
-
-#define ENA 6 // D6
+#define ENA 6
 #define ENB 11
 
-#define AIN1 4 // D4
-#define AIN2 5 // D5
-#define BIN1 10 // D10
-#define BIN2 9 // D9
+#define AIN1 4
+#define AIN2 5
+#define BIN1 10
+#define BIN2 9
 
-#define AC1 21 // D2
-#define AC2 20 // D3
-#define BC1 19 // D7
-#define BC2 18 // D8
+#define AC1 21
+#define AC2 20
+#define BC1 19
+#define BC2 18
 
-
-#define baud 115200
+#define baud 9600
 
 #define pi 3.1415
-
 
 Servo servo; //Defines the object Servo of type(class) Servo
 int angle = 0; // Defines an integer
 
-// ************ DEFINITIONS A************
+float Theta_old = 0.0;
+// ************ DEFINITIONS A (L)************
 volatile long EncoderCountA = 0;
-float ThetaA_prev, ThetaB_prev;
-float RPM_A;
-float vel_A;
+float ThetaA, ThetaA_prev;
+float Dist_A, vel_A, RPM_A;
 int PWM_A_val;
-float Dist_A;
-// ************ DEFINITIONS B************
+float kp_A = 1.24;
+float ki_A = 0.02;
+float kd_A = 10.8;
+
+// ************ DEFINITIONS B (R)************
 volatile long EncoderCountB = 0;
-float ThetaA, ThetaB;
-float RPM_B;
-float vel_B;
+float ThetaB, ThetaB_prev;
+float Dist_B, vel_B, RPM_B;
 int PWM_B_val;
-float Dist_B;
+float kp_B = 1;
+float ki_B = 0.01 ;
+float kd_B = 10;
+
+// ************ VARIABES PID RPM************
+float e_A, e_prev_A;
+float inte_A, inte_prev_A;
+float e_B, e_prev_B;
+float inte_B, inte_prev_B;
+int RPM_A_ref, RPM_B_ref;
 
 
+
+// ************ VARIABES PID POSE************
+float Pose_X, Pose_Y, Pose_Theta, Pose_Theta_ref;
+float Pose_X_final = 1;
+float Pose_Y_final = 0;
+float Pose_Theta_final = 0;
+int state_pid_pose = 0;
+
+// ************ VARIABES PID ROT************
+float kp_giro = 1;
+float ki_giro = 0.1;
+float e_giro, e_prev_giro, inte_giro, inte_prev_giro;
+float Vel_Rot_ref, RPM_Rot_ref;
+float e_giro_margin = 10;
+float e_giro_margin_factor = 1.1;
+
+// ************ VARIABES PID DESP************
+float kp_desp = 0.05;
+float ki_desp = 1;
+float e_desp, e_prev_desp, inte_desp, inte_prev_desp;
+float Vel_Desp_ref, RPM_Desp_ref;
+float e_desp_margin = 0.05;
+
+
+// ************ ODOMETRIA************
 float Pos_x, Pos_y;
-float Vel_lin, Vel_x, Vel_y;
-float Vel_ang, Theta;
+float Theta = 0.0;
+float Vel_ang, Vel_lin, Vel_x, Vel_y;
 
-unsigned long t, t_prev;
+// ************ TIEMPO************
 int dt;
+unsigned long t, t_prev;
 
-float NFactor = 1500;
-int PWM_min = 150;
-int PWM_max = 255;
 
 char msg[60];
-float Diam_ruedas = 0.065;
+
+// PARAMETROS FISICOS ROBOT
+float Diam_ruedas = 0.09;
 float R_ruedas = Diam_ruedas/2;
-float L_robot = (320-26)/2;
+float L_robot = 0.370-0.055;
+float NFactor = 1400;
+int PWM_min = 150;
+int PWM_max = 255;
 
 int instruction = -1;
 
@@ -71,77 +111,10 @@ int distance;
 
 unsigned long startScoop = 0;
 unsigned long currentMillis = 0;
-unsigned long lastScoopMillestone = 0;
-unsigned long lastUS;
 
 int agarro_castana = 0;
 int scooping = 0;
 
-HCSR04 hc(trigPin, echoPin);
-
-void scoop() {
-  // The following loop runs until the servo is turned to 180 degrees
-  // Serial.println("scooping");
-  currentMillis = millis();
-  if(scooping == 1){
-    if (currentMillis - lastScoopMillestone >= SCOOPDELAY) {
-        angle++;
-        servo.write(angle);
-        lastScoopMillestone = currentMillis;
-    }
-    if(angle >= MAXANG){
-      scooping = 2;
-      lastScoopMillestone = currentMillis;
-    }
-  }
-  if(scooping == 2){
-    if (currentMillis - lastScoopMillestone >= 500) {
-      scooping = 3;
-      lastScoopMillestone = currentMillis;
-    }
-  }
-  if(scooping == 3){
-    currentMillis = millis();
-    if (currentMillis - lastScoopMillestone >= SCOOPDELAY) {
-        angle--;
-        servo.write(angle);
-        lastScoopMillestone = currentMillis;
-    }
-    if(angle <= MINANG){
-      scooping = 4;
-      lastScoopMillestone = currentMillis;
-    }
-  }
-  if(scooping == 4){
-    if (currentMillis - lastScoopMillestone >= 2000) {
-      distance = 12;
-      scooping = 0;
-    }
-  }
-}
-
-
-int sign(int x) {
-  if (x > 0) {
-    return 1;
-  } else if (x < 0) {
-    return -1;
-  } else {
-    return 0;
-  }
-}
-
-
-int CheckPWM(int PWM_val)
-{
-    if (abs(PWM_val) < PWM_min){
-        return int(sign(PWM_val) * PWM_min);
-    }
-    if (abs(PWM_val) > PWM_max){
-        return int(sign(PWM_val) * PWM_max);
-    }
-    return PWM_val;
-}
 
 void WriteDriverVoltageA(int PWM_val)
 {
@@ -256,17 +229,27 @@ void ISR_EncoderB1() {
     }
   }
 }
-
-void readSerialPort() {
-  if (Serial.available() > 0) {
-    String msga= Serial.readStringUntil('\n');
-    Serial.println(msga);
+int sign(int x) {
+  if (x > 0) {
+    return 1;
+  } else if (x < 0) {
+    return -1;
+  } else {
+    return 0;
   }
 }
 
 
 void setup() {
   Serial.begin(baud);
+  while (!Serial) {
+    delay(10);
+  }
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
   pinMode(AC1, INPUT_PULLUP);
   pinMode(AC2, INPUT_PULLUP);
   pinMode(BC1, INPUT_PULLUP);
@@ -279,96 +262,155 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  servo.attach(ServoPin); // States that the servo is attached to pin 5
-  servo.write(angle);
-
+  state_pid_pose = 0;
 }
-
 void loop() {
-  if (Serial.available() > 0)
-  {
-      String data = Serial.readStringUntil('\n');
-      Serial.print("You sent me: ");
+  //sensors_event_t a, g, temp;
+  //mpu.getEvent(&a, &g, &temp);
+  //Theta = (g.gyro.z * dt) / 1000 + Theta_old;
+  if ((millis() - t_prev)>= 100) {
+    t = millis();
+    ThetaA = EncoderCountA; 
+    ThetaB = EncoderCountB;
+    Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas;
+    Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas;
+    dt = t - t_prev;
+    RPM_A = 1000 * (ThetaA - ThetaA_prev) / dt * 60.0 / NFactor;
+    RPM_B = 1000 * (ThetaB - ThetaB_prev) / dt * 60.0 / NFactor;
+    vel_A = RPM_A * pi * 2 / 60.0;                  // [rad/s]
+    vel_B = RPM_B * pi * 2 / 60.0;                  // [rad/s]
+    Vel_ang = R_ruedas * (vel_B - vel_A) / L_robot; // [rad/s]
 
-      // Convert the string values to integers
-      PWM_A_val = getValue(data, ',', 0).toInt();
-      PWM_B_val = getValue(data, ',', 1).toInt();
-      Serial.print(PWM_A_val);
-      Serial.print(',');
-      Serial.println(PWM_B_val);
-  }
-  else{
-    if(millis() - lastUS > 100){
-      distance = hc.dist();
-      lastUS = millis();
-    }
-  }
-  if(scooping == 0){
-    if(distance < 9){
-      distance = 12;
-      scooping = 1;
-      startScoop = millis();
-    }
-  }
-  
-  if(scooping == 1 || scooping == 2){
-    scoop();
-  }
-  
-  if(scooping == 3){
-    if(millis()-startScoop >= 1600){
-      scooping = 0;
-    }
-  }
-  if ((millis() - t_prev)>= 50) {
-      if(scooping == 0){
-        //checkDistance();
+    //---------------MODIFICACION------------------
+    
+    Theta = Theta + Vel_ang * dt / 1000; // [rad] //--------------------------Reemplazo theta por el giroscopio
+
+    //Theta = (g.gyro.z * dt) / 1000 + theta_old;
+    //---------Néstor, imprime Rpi 4----------------
+
+    Vel_lin = R_ruedas * (vel_A + vel_B) / 2; // [m/s]
+    Vel_x = Vel_lin * cos(Theta);             // [m/s]
+    Vel_y = Vel_lin * sin(Theta);             // [m/s]
+    Pos_x = Pos_x + (Vel_x * dt) / 1000;      // [m]
+    Pos_y = Pos_y + (Vel_y * dt) / 1000;      // [m]
+
+    Pose_X = Pos_x;
+    Pose_Y = Pos_y;
+    Pose_Theta = Theta;
+
+    e_desp = sqrt((Pose_X_final - Pose_X) * (Pose_X_final - Pose_X) + (Pose_Y_final - Pose_Y) * (Pose_Y_final - Pose_Y));
+    if (state_pid_pose == 0)
+    { // 0: girando para alinear
+      Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
+      e_giro = Pose_Theta_ref - Pose_Theta;
+      if (abs(e_giro) < e_giro_margin)
+      {
+        state_pid_pose = 1;
+        e_prev_giro = 0;
+        inte_prev_giro = 0;
+        Serial.println("CAMGIO A 1");
       }
-      t = millis();
-      ThetaA = EncoderCountA;
-      ThetaB = EncoderCountB;
-      Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas;
-      Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas;
-      dt = t - t_prev;
-      RPM_A = 1000 * (ThetaA - ThetaA_prev)/ dt * 60.0 / NFactor;
-      RPM_B = 1000 * (ThetaB - ThetaB_prev)/ dt * 60.0 / NFactor;
-      if(scooping == 0){
-        WriteDriverVoltageA(PWM_A_val);
-        WriteDriverVoltageB(PWM_B_val);
+      else
+      {
+        inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
+        Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
+        RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2 * pi);     //
+        RPM_A_ref = -RPM_Rot_ref;
+        RPM_B_ref = RPM_Rot_ref;
+        e_prev_giro = e_giro;
+        inte_prev_giro = inte_giro;
       }
-      else{
-        WriteDriverVoltageA(0);
-        WriteDriverVoltageB(0);
       }
-
-      vel_A = RPM_A * pi * 2 / 60.0;
-      vel_B = RPM_B * pi * 2 / 60.0;
-      Vel_ang = R_ruedas * (vel_B - vel_A) / L_robot;
-      Theta = Theta + Vel_ang*dt/1000;
-      Vel_lin = R_ruedas * (vel_A + vel_B) / 2;
-      Vel_x = Vel_lin * cos(Theta);
-      Vel_y = Vel_lin * sin(Theta);
-      Pos_x = Pos_x + (Vel_x*dt)/1000;
-      Pos_y = Pos_y + (Vel_y*dt)/1000;
-
-      Serial.print("PWMA: ");
-      Serial.print(PWM_A_val);
-
-      Serial.print("PWMB: ");
-      Serial.println(PWM_B_val);
       
-      //Serial.print("POSX: ");
-      //Serial.print(Pos_x);
-      //Serial.print("POSY: ");
-      //Serial.print(Pos_y);
-      //Serial.print("Theta");
-      //sSerial.println(Theta);
-
+      else if (state_pid_pose == 1){ // 1: aavanzado apra llegara
+          Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
+          e_giro = Pose_Theta_ref - Pose_Theta;
+          if (abs(e_giro) > e_giro_margin*e_giro_margin_factor){
+              state_pid_pose = 0;
+          } else {
+              if (e_desp < e_desp_margin){
+                  state_pid_pose = 2;
+                  e_prev_desp = 0;
+                  inte_prev_desp = 0;
+                  Serial.println("CAMGIO A 2");
+              } else {
+                  inte_desp = inte_prev_desp + (dt * (e_desp + e_prev_desp) / 2);
+                  Vel_Desp_ref = float(kp_desp * e_desp + ki_desp * inte_desp); // m/s
+                  RPM_Desp_ref = Vel_Desp_ref * 60 / (2*pi);
+                  RPM_A_ref = RPM_Desp_ref; 
+                  RPM_B_ref = RPM_Desp_ref; 
+                  e_prev_desp = e_desp;
+                  inte_prev_desp = inte_desp;
+              }
+          }
+      }
       
+      else if (state_pid_pose == 2){// 2: girando para llegar
+          e_giro = Pose_Theta_final - Pose_Theta;
+          if (e_giro < e_giro_margin){
+              state_pid_pose = 3;
+              Serial.println("CAMGIO A 3");
+          } else{
+              inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
+              Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
+              RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2*pi); //
+              RPM_A_ref = -RPM_Rot_ref; 
+              RPM_B_ref = RPM_Rot_ref; 
+              e_prev_giro = e_giro;
+              inte_prev_giro = inte_giro;
+          }
+      }
+
+      else if (state_pid_pose == 3){ // 3: idlee
+          RPM_A_ref = 0; 
+          RPM_B_ref = 0;    
+      }
+      
+
+      e_A = RPM_A_ref - RPM_A;
+      e_B = RPM_B_ref - RPM_B;
+      inte_A = inte_prev_A + (dt * (e_A + e_prev_A) / 2);
+      inte_B = inte_prev_B + (dt * (e_B + e_prev_B) / 2);
+      PWM_A_val = int(kp_A * e_A + ki_A * inte_A + (kd_A * (e_A - e_prev_A) / dt));
+      PWM_B_val = int(kp_B * e_B + ki_B * inte_B + (kd_B * (e_B - e_prev_B) / dt));
+      e_prev_A = e_A;
+      e_prev_B = e_B;
+      inte_prev_A = inte_A;
+      inte_prev_B = inte_B;
+
+    
+      WriteDriverVoltageA(PWM_A_val);
+      WriteDriverVoltageB(PWM_B_val);
+
+      Serial.print(t);
+      Serial.print(", ");
+      Serial.print("state: ");
+      Serial.print(state_pid_pose);
+      //Serial.print("RPMROT:");
+      //Serial.print(round(RPM_Rot_ref));
+      //Serial.print(" RPMDESP:");
+      //Serial.print(round(RPM_Desp_ref));
+      //Serial.print(" PWMA:");
+      //Serial.print(PWM_A_val);
+      //Serial.print(" PWMB:");
+      //Serial.print(PWM_B_val);
+
+      Serial.print(", Egiro: ");
+      Serial.print(e_giro);
+      Serial.print(", Edesp: ");
+      Serial.print(e_desp);
+      
+      Serial.print(", PosX: ");
+      Serial.print(Pose_X);
+      Serial.print(", PosY: ");
+      Serial.print(Pose_Y);
+      Serial.print(", Pos_Theta: ");
+      Serial.print(round(Pose_Theta*180/pi));
+      Serial.println("");
+
       ThetaA_prev = ThetaA;
       ThetaB_prev = ThetaB;
+      Theta_old = Theta;
       t_prev = t;
   }
 }
