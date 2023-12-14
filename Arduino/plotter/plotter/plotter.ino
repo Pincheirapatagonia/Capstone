@@ -55,6 +55,7 @@ void loop() {
   //-------------Calculo de Theta-----------------
   dt = (t-t_old);
   theta = (g.gyro.z*dt)/1000+theta_old;
+  vel_y = (a.acceleration.y*dt)/1000+vel_y_old;
   
   Serial.print(",");
   Serial.print("dt:");
@@ -65,8 +66,12 @@ void loop() {
   Serial.print(",");
   Serial.print("Theta:");
   Serial.print(theta);
+  Serial.print(",");
+  Serial.print("VelY:");
+  Serial.print(vel_y);
   Serial.println("");
   t_old = t;
   theta_old = theta;
+  vel_y_old = vel_y;
   delay(10);
 }
