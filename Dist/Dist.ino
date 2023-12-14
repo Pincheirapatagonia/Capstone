@@ -1,10 +1,8 @@
 #include <Servo.h> //Imports the library Servo
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
+#include <MPU6050.h>
 #include <Wire.h>
 
-Adafruit_MPU6050 mpu;
-
+MPU6050 mpu;
 
 #define ENA 6
 #define ENB 11
@@ -22,7 +20,6 @@ Adafruit_MPU6050 mpu;
 #define pi 3.1415
 
 
-
 // ************ DEFINITIONS A (L)************
 volatile long EncoderCountA = 0;
 float Enc_A, Enc_A_prev;
@@ -34,6 +31,14 @@ volatile long EncoderCountB = 0;
 float Enc_B, Enc_B_prev;
 float Dist_B, vel_B, RPM_B;
 int PWM_B_val;
+
+// MPU: Pitch, Roll and Yaw values
+float pitch = 0;
+float roll = 0;
+float yaw = 0;
+float pitch_vel;
+float roll_vel;
+float yaw_vel;
 
 // ************ VARIABES PID RPM************
 int PWM_MAX = 255;
@@ -57,6 +62,7 @@ float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
 
 
 // ************ TIEMPO************
+int Ts = 10 // [ms]
 int dt;
 unsigned long t, t_prev;
 
@@ -74,27 +80,22 @@ void setup() {
   while (!Serial) {
     delay(10);
   }
-  // Try to initialize!
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
+  
+  while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)){
+    Serial.println("Could not find a valid MPU6050 sensor, check wiring!");
+    delay(500);
   }
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  mpu.calibrateGyro();
 
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  t_prev = millis();
 }
 
 void loop() {
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  if ((millis() - t_prev)>= 100) {
+  if ((millis() - t_prev)>= Ts) {
     t = millis();
     dt = t - t_prev; // [ms]
 
@@ -110,22 +111,24 @@ void loop() {
     Enc_A_prev = Enc_A;
     Enc_B_prev = Enc_B;
 
-    //---------------ODOMETRIA ENCODER------------------
+    //---------------ODOMETRIA------------------
 
     // Giro con IMU
-    Vel_Theta = g.gyro.z;                                  // [rad/s]
-    Pose_Theta = Pose_Theta + (Vel_Theta * dt) / 1000; // [rad]
+    Vector norm = mpu.readNormalizeGyro();
+    Vel_Theta = norm.ZAxis;   // [°/s]
+    Pose_Theta = Vel_Theta*dt/1000 + Pose_Theta;  // [°]
 
     //Giro con ENCODER
     // Vel_Theta = R_ruedas * (vel_B - vel_A) / L_robot; // [rad/s]
     // Pose_Theta = Vel_Theta * dt / 1000 + Pose_Theta;  // [rad] 
 
     Vel_Lin = R_ruedas * (vel_A + vel_B) / 2; // [m/s]
-    Vel_X = Vel_Lin * cos(Pose_Theta);             // [m/s]
-    Vel_Y = Vel_Lin * sin(Pose_Theta);             // [m/s]
+    Vel_X = Vel_Lin * cos(Pose_Theta*pi/180);             // [m/s]
+    Vel_Y = Vel_Lin * sin(Pose_Theta*pi/180);             // [m/s]
     Pose_X = (Vel_X*dt)/1000 + Pose_X;      // [m]
     Pose_Y = (Vel_Y*dt)/1000 + Pose_Y;      // [m]
 
+    //---------------PID------------------
 
     e_Rot_prev = e_Rot;
     e_Dist_prev = e_Dist;
