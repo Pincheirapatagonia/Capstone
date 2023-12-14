@@ -1,9 +1,7 @@
 #include <Servo.h> //Imports the library Servo
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <Wire.h>
 
-Adafruit_MPU6050 mpu;
+
+
 
 //GeeKee CeeBee
 #define trigPin 3 // TriggerSensor
@@ -86,12 +84,6 @@ float enc_Pos_x, enc_Pos_y, enc_Theta;
 float enc_Vel_ang, enc_Vel_lin, enc_Vel_x, enc_Vel_y;
 float enc_vel_A, enc_vel_B, enc_RPM_A, enc_RPM_B;
 
-// ************ ODOMETRIA MPU ************
-float mpu_x_vel, mpu_y_vel;
-float mpu_Pos_x, mpu_Pos_y, mpu_Theta;
-float mpu_Vel_ang, mpu_Vel_lin, mpu_Vel_x, mpu_Vel_y;
-float mpu_vel_A, mpu_vel_B, mpu_RPM_A, mpu_RPM_B;
-
 
 // ************ TIEMPO************
 int dt;
@@ -156,30 +148,13 @@ void WriteDriverVoltageB(int PWM_val){
 }
 
 
-void setup() {
-  Serial.begin(baud);
-  while (!Serial) {
-    delay(10);
-  }
-
-
-    // Try to initialize!
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
-  }
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-
+void setup(){
 
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  state_pid_pose = 0;
+
 }
 void loop() {
   sensors_event_t a, g, temp;
@@ -209,63 +184,20 @@ void loop() {
     enc_Pos_x = enc_Pos_x + (enc_Vel_x * dt) / 1000;      // [m]
     enc_Pos_y = enc_Pos_y + (enc_Vel_y * dt) / 1000;      // [m]
     
-    //---------------ODOMETRIA ACELEROMETRO------------------
-    mpu_Vel_ang = g.gyro.z;
-    mpu_Theta = mpu_Theta + (mpu_Vel_ang * dt) / 1000;                     // [rad/s]
-    mpu_x_vel = (g.acceleration.x * dt)/1000 + mpu_x_vel;                  // [m/s]
-    mpu_y_vel = (g.acceleration.y * dt)/1000 + mpu_y_vel;                  // [m/s]
-    mpu_Vel_lin = sqrt(mpu_x_vel*mpu_x_vel + mpu_y_vel*mpu_y_vel);         // [m/s]
-    mpu_Vel_x = mpu_x_vel*(-sin(mpu_Theta)) + mpu_y_vel*(-cos(mpu_Theta)); // [m/s]
-    mpu_Vel_y = mpu_x_vel*cos(mpu_Theta) + mpu_y_vel*(-sin(mpu_Theta));    // [m/s]
-    mpu_Pos_x = mpu_Pos_x + (mpu_Vel_x * dt) / 1000;                       // [m]
-    mpu_Pos_y = mpu_Pos_y + (mpu_Vel_y * dt) / 1000;                       // [m]
-    mpu_vel_A = mpu_Vel_lin - mpu_Vel_ang*L_robot/2;
-    mpu_vel_B = mpu_Vel_lin + mpu_Vel_ang*L_robot/2;
-    mpu_RPM_A = mpu_vel_A * 60 / (2*pi);
-    mpu_RPM_B = mpu_vel_B * 60 / (2*pi);
-
-  //---------------MUX DE ODOMETRIA------------------
-    if (select_pose_encoder == 1){
-        Pose_X = enc_Pos_x;
-        Pose_Y = enc_Pos_y;
-        Pose_Theta = enc_Theta;
-        Vel_X = enc_Vel_x;
-        Vel_Y = enc_Vel_y;
-        Vel_Theta = enc_Vel_ang;
-        RPM_A = enc_RPM_A;
-        RPM_B = enc_RPM_B;
-    } else {
-        Pose_X = mpu_Pos_x;
-        Pose_Y = mpu_Pos_y;
-        Pose_Theta = mpu_Theta;
-        Vel_X = mpu_Vel_x;
-        Vel_Y = mpu_Vel_y;
-        Vel_Theta= mpu_Vel_ang;
-        RPM_A = mpu_RPM_A;
-        RPM_B = mpu_RPM_B;
-    } 
+    Pose_X = enc_Pos_x;
+    Pose_Y = enc_Pos_y;
+    Pose_Theta = enc_Theta;
+    Vel_X = enc_Vel_x;
+    Vel_Y = enc_Vel_y;
+    Vel_Theta = enc_Vel_ang;
+    RPM_A = enc_RPM_A;
+    RPM_B = enc_RPM_B;
+    
         
     //---------------POSE PI CONTROL------------------
     e_desp = sqrt((Pose_X_final - Pose_X) * (Pose_X_final - Pose_X) + (Pose_Y_final - Pose_Y) * (Pose_Y_final - Pose_Y));
-    if (state_pid_pose == 0){ // 0: girando para alinear
-        e_giro = atan2(Pose_Y_final, Pose_X_final) - Pose_Theta;
-        if (abs(e_giro) < e_giro_margin){
-            state_pid_pose = 1;
-            e_prev_giro = 0;
-            inte_prev_giro = 0;
-          
-        }
-        else{
-            inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
-            Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
-            RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2 * pi);     //
-            RPM_A_ref = -RPM_Rot_ref;
-            RPM_B_ref = RPM_Rot_ref;
-            e_prev_giro = e_giro;
-            inte_prev_giro = inte_giro;
-        }
-    }
-    else if (state_pid_pose == 1){ // 1: aavanzado apra llegara
+    
+   if (state_pid_pose == 1){ // 1: aavanzado apra llegara
         e_giro = atan2(Pose_Y_final, Pose_X_final) - Pose_Theta;
         if (abs(e_giro) > e_giro_margin*e_giro_margin_factor){
             state_pid_pose = 0;
@@ -287,27 +219,7 @@ void loop() {
             }
         }
     }
-    else if (state_pid_pose == 2){// 2: girando para llegar
-        e_giro = Pose_Theta_final - Pose_Theta;
-        if (e_giro < e_giro_margin){
-            state_pid_pose = 3;
-            
-        }
-        else{
-            inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
-            Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro); // rad/s
-            RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2*pi); //
-            RPM_A_ref = -RPM_Rot_ref; 
-            RPM_B_ref = RPM_Rot_ref; 
-            e_prev_giro = e_giro;
-            inte_prev_giro = inte_giro;
-        }
-      }
-    else if (state_pid_pose == 3){ // 3: idlee
-        RPM_A_ref = 0; 
-        RPM_B_ref = 0;    
-    }
-      
+    
      //---------------POSE PI CONTROL------------------
     e_A = RPM_A_ref - RPM_A;
     e_B = RPM_B_ref - RPM_B;

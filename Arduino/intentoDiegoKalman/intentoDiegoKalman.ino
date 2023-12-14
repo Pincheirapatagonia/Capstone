@@ -103,6 +103,7 @@ void setup() {
 #ifdef RESTRICT_PITCH // Eq. 25 and 26
   double roll  = atan2(accY, accZ) * RAD_TO_DEG;
   double pitch = atan(-accX / sqrt(accY * accY + accZ * accZ)) * RAD_TO_DEG;
+  double yaw   = 0;
 #else // Eq. 28 and 29
   double roll  = atan(accY / sqrt(accX * accX + accZ * accZ)) * RAD_TO_DEG;
   double pitch = atan2(-accX, accZ) * RAD_TO_DEG;
@@ -110,6 +111,7 @@ void setup() {
 
   kalmanX.setAngle(roll); // Set starting angle
   kalmanY.setAngle(pitch);
+  kalmanZ.setAngle(yaw);
   gyroXangle = roll;
   gyroYangle = pitch;
   compAngleX = roll;
