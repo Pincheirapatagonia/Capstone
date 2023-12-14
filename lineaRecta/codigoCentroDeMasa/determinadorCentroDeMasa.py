@@ -120,10 +120,10 @@ def calculate_center_of_rotation(video_path):
             cv2.imshow("BWframe", BWframe)
             cv2.imshow("IMGCut", img_croped)
 
-            if i == 170:  # 150
-                cv2.imwrite("IMGIzqCut.jpg", img_croped)
-            elif i == 180:  # 170
-                cv2.imwrite("IMGIzqCut2.jpg", img_croped)
+            if i == 0: #170:  # 150
+                cv2.imwrite("IMGCut.jpg", img_croped)
+            elif i == 95: #180:  # 170
+                cv2.imwrite("IMGCut2.jpg", img_croped)
             # Update the slider position
             
             i += 1
@@ -142,7 +142,7 @@ def calculate_center_of_rotation(video_path):
 
 
 # Calculate the center of rotation for "giroDerecha.mp4"
-#calculate_center_of_rotation("giroDerecha.mp4")
+calculate_center_of_rotation("giroDerecha.mp4")
 
 # Calculate the center of rotation for "giroIzquierda.mp4"
-calculate_center_of_rotation("giroIzquierda.mp4")
+#calculate_center_of_rotation("giroIzquierda.mp4")
