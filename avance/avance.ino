@@ -34,8 +34,8 @@ volatile long EncoderCountA = 0;
 float ThetaA, ThetaA_prev;
 float Dist_A, vel_A, RPM_A;
 int PWM_A_val;
-float kp_A = 6.102;
-float ki_A = .00015;        // /1000
+float kp_A = 5.02;
+float ki_A = .0001;        // /1000
 float kd_A = 0.00000; // *1000
 
 // ************ DEFINITIONS B (R)************
@@ -43,8 +43,8 @@ volatile long EncoderCountB = 0;
 float ThetaB, ThetaB_prev;
 float Dist_B, vel_B, RPM_B;
 int PWM_B_val;
-float kp_B = 5.99;
-float ki_B = .0014; // /1000
+float kp_B = 4.97;
+float ki_B = .001; // /1000
 float kd_B = 0.00000000; // *1000
 
 // ************ VARIABES PID RPM************
@@ -66,8 +66,8 @@ float Pose_Theta_final = 0;
 
 float kp_giro = 35;
 float ki_giro = 0.0;
-float kp_desp = 0.5;
-float ki_desp = 0.001;
+float kp_desp = 0.9;
+float ki_desp = 0.01;
 float e_giro_margin = 0.2;  // approx 5°
 float e_giro_margin_factor = 1.1;
 float e_desp_margin = 0.025;
@@ -232,6 +232,7 @@ void loop() {
   if ((millis() - t_prev) >= 100) {
     t = millis();
 
+
     //---------------CALCULAR VELOCIDADES------------------
     ThetaA = EncoderCountA;
     ThetaB = EncoderCountB;
@@ -263,66 +264,6 @@ void loop() {
     RPM_B = enc_RPM_B;
 
     //---------------POSE PI CONTROL------------------
-    e_desp = sqrt((Pose_X_final - Pose_X) * (Pose_X_final - Pose_X) + (Pose_Y_final - Pose_Y) * (Pose_Y_final - Pose_Y));
-    if (state_pid_pose == 0) {  // 0: girando para alinear
-      Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
-      e_giro = Pose_Theta_ref - Pose_Theta;
-      if (abs(e_giro) < e_giro_margin) {
-        state_pid_pose = 1;
-        e_prev_giro = 0;
-        inte_prev_giro = 0;
-      } else {
-        inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
-        
-        Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro);  // rad/s
-        RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (2 * pi);      //
-        RPM_A_ref = -RPM_Rot_ref;
-        RPM_B_ref = RPM_Rot_ref;
-        e_prev_giro = e_giro;
-        inte_prev_giro = inte_giro;
-      }
-    } else if (state_pid_pose == 1) {  // 1: aavanzado apra llegara
-      Pose_Theta_ref = atan2(Pose_Y_final, Pose_X_final);
-      e_giro = Pose_Theta_ref - Pose_Theta;
-      if (abs(e_giro) > e_giro_margin * e_giro_margin_factor) {
-        state_pid_pose = 0; //0
-      } else {
-        if (e_desp < e_desp_margin) {
-          state_pid_pose = 2; //2
-          e_prev_desp = 0;
-          inte_prev_desp = 0;
-        } else {
-          inte_desp = inte_prev_desp + (dt * (e_desp + e_prev_desp) / 2);
-          Vel_Desp_ref = float(kp_desp * e_desp + ki_desp * inte_desp);  // m/s
-          RPM_Desp_ref = Vel_Desp_ref * 60 / (pi * Diam_ruedas);
-          RPM_A_ref = RPM_Desp_ref;
-          RPM_B_ref = RPM_Desp_ref;
-          e_prev_desp = e_desp;
-          inte_prev_desp = inte_desp;
-        }
-      }
-    } else if (state_pid_pose == 2) {  // 2: girando para llegar
-      Pose_Theta_ref = Pose_Theta_final;
-      e_giro = Pose_Theta_ref - Pose_Theta;
-      if (e_giro < e_giro_margin) {
-        state_pid_pose = 3;
-      } else {
-        inte_giro = inte_prev_giro + (dt * (e_giro + e_prev_giro) / 2);
-        Vel_Rot_ref = float(kp_giro * e_giro + ki_giro * inte_giro);  // rad/s
-        RPM_Rot_ref = Vel_Rot_ref * L_robot / 2 * 60 / (pi * Diam_ruedas);      //
-        RPM_A_ref = -RPM_Rot_ref;
-        RPM_B_ref = RPM_Rot_ref;
-        e_prev_giro = e_giro;
-        inte_prev_giro = inte_giro;
-      }
-    } else if (state_pid_pose == 3) {  // 3: idlee
-      RPM_A_ref = 0;
-      RPM_B_ref = 0;
-    }
-
-    // RPM_A_ref = 150.0;
-    // RPM_B_ref = 150.0;
-    //---------------POSE PI CONTROL------------------
     e_A = RPM_A_ref - RPM_A;
     e_B = RPM_B_ref - RPM_B;
     inte_A = inte_prev_A + (dt * (e_A + e_prev_A) / 2);
@@ -333,32 +274,19 @@ void loop() {
     e_prev_B = e_B;
     inte_prev_A = inte_A;
     inte_prev_B = inte_B;
+
     WriteDriverVoltageA(PWM_A_val);
     WriteDriverVoltageB(PWM_B_val);
 
 
-    // if (t<5000){
-    //   WriteDriverVoltageA(PWM_A_val);
-    //   WriteDriverVoltageB(PWM_B_val);
-    // }
-    // else{
+    // if (Pose_X < 1){
+    //   WriteDriverVoltageA(155);
+    //   WriteDriverVoltageB(155);
+    // } else {
     //   WriteDriverVoltageA(0);
     //   WriteDriverVoltageB(0);
     // }
 
-    // if (Pose_X < 1){
-    //   WriteDriverVoltageA(PWM_A_val);
-    //   WriteDriverVoltageB(PWM_B_val);
-    //   // RPM_A_ref = 200.0;
-    //   // RPM_B_ref = 200.0;
-    // }
-    // else{
-    //   WriteDriverVoltageA(0);
-    //   WriteDriverVoltageB(0);
-    //   // RPM_A_ref = 0.0;
-    //   // RPM_B_ref = 0.0;
-    // }
-    
 
 
     //---------------PRINTS------------------
@@ -374,8 +302,8 @@ void loop() {
     Serial.print("PosY:");
     Serial.print(Pose_Y);
     Serial.print(",");
-    // Serial.print("Pos_Theta:");
-    // Serial.print(round(Pose_Theta*180/pi));
+    Serial.print("Pos_Theta:");
+    Serial.print(round(Pose_Theta*180/pi));
     // Serial.print(",");
     // Serial.print("VelX:");
     // Serial.print(Vel_X);
