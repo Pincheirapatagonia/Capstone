@@ -1,6 +1,5 @@
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include <MPU6050.h>
 
 #define pi 3.1415
 #define ENA 6
@@ -11,15 +10,16 @@
 #define BIN1 10
 #define BIN2 9
 
-#define AC1 21 // D2
-#define AC2 20 // D3
-#define BC1 19 // D7
-#define BC2 18 // D8
+#define AC1 19 // D2
+#define AC2 18 // D3
+#define BC1 2 // D7
+#define BC2 3 // D8
 
 #define baud 9600
 
 
-Adafruit_MPU6050 mpu;
+MPU6050 mpu;
+
 
 // Definitions
 float dist, err_dist,  e_dist = 0, e_prev_dist = 0;
@@ -29,6 +29,7 @@ float err_vel, e_vel = 0, e_prev_vel = 0;
 
 float ref_dist = 1;
 
+float theta, theta_old;
 
 volatile long EncoderCountA = 0;
 float ThetaA, ThetaA_prev;
@@ -59,50 +60,37 @@ int PWM_max = 255;
 int dt, t, t_prev;
 int PWM_dist, PWM_vel, PWMA, PWMB;
 
-void ISR_EncoderA2() {
-  bool PinB = digitalRead(AC2);
-  bool PinA = digitalRead(AC1);
+float pitch = 0;
+float roll = 0;
+float yaw = 0;
+float pitch_vel;
+float roll_vel;
+float yaw_vel;
 
-  if (PinB == LOW) {
-    if (PinA == HIGH) {
-      EncoderCountA++;
+void ISR_EncoderA1()
+{
+    if (digitalRead(AC1) == digitalRead(AC2))
+    {
+        EncoderCountA++;
     }
-    else {
-      EncoderCountA--;
+    else
+    {
+        EncoderCountA--;
     }
-  }
-
-  else {
-    if (PinA == HIGH) {
-      EncoderCountA--;
-    }
-    else {
-      EncoderCountA++;
-    }
-  }
 }
-void ISR_EncoderA1() {
-  bool PinB = digitalRead(AC2);
-  bool PinA = digitalRead(AC1);
 
-  if (PinA == LOW) {
-    if (PinB == HIGH) {
-      EncoderCountA--;
+void ISR_EncoderA2()
+{
+    if (digitalRead(AC1) == digitalRead(AC2))
+    {
+        EncoderCountA--;
     }
-    else {
-      EncoderCountA++;
+    else
+    {
+        EncoderCountA++;
     }
-  }
-
-  else {
-    if (PinB == HIGH) {
-      EncoderCountA++;
-    }
-    else {
-      EncoderCountA--;
-    }
-  }
 }
+
 void ISR_EncoderB2() {
   bool PinB = digitalRead(BC2);
   bool PinA = digitalRead(BC1);
@@ -152,64 +140,97 @@ void setup() {
   Serial.begin(9600);
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
+  
+
+  pinMode(AC1, INPUT_PULLUP);
+  digitalWrite(AC1, HIGH);
+  pinMode(AC2, INPUT_PULLUP);
+  digitalWrite(AC2, HIGH);
+
+  pinMode(BC1, INPUT_PULLUP);
+  digitalWrite(BC1, HIGH);
+  pinMode(BC2, INPUT_PULLUP);
+  digitalWrite(BC2, HIGH);
+
   attachInterrupt(digitalPinToInterrupt(AC1), ISR_EncoderA1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(AC2), ISR_EncoderA2, CHANGE);
   attachInterrupt(digitalPinToInterrupt(BC1), ISR_EncoderB1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(BC2), ISR_EncoderB2, CHANGE);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
+  // Initialize MPU6050
+  while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)){
+    Serial.println("Could not find a valid MPU6050 sensor, check wiring!");
+    delay(500);
   }
+  
+  // Calibrate gyroscope. The calibration must be at rest.
+  // If you don't want calibrate, comment this line.
+  mpu.calibrateGyro();
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  // Set threshold sensivty. Default 3.
+  // If you don't want use threshold, comment this line or set 0.
+  // mpu.setThreshold(3);
+  t_prev = millis();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  t = millis();
-  ThetaA = EncoderCountA; 
-  ThetaB = EncoderCountB;
-  Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas; // [m]
-  Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas; // [m]
-  dist = (Dist_A + Dist_B)/2;
-  dt = t - t_prev; // [ms]
-  enc_RPM_A = 1000 * (ThetaA - ThetaA_prev) / dt * 60.0 / NFactor;
-  enc_RPM_B = 1000 * (ThetaB - ThetaB_prev) / dt * 60.0 / NFactor;
-  enc_vel_A = enc_RPM_A * pi * 2 / 60.0;                  // [rad/s]
-  enc_vel_B = enc_RPM_B * pi * 2 / 60.0;                  // [rad/s]
-  ThetaA_prev = ThetaA;
-  ThetaB_prev = ThetaB;
+  
+  if ((millis()-t_prev)>=10){
 
-  theta = (g.gyro.z*dt)/1000+theta_old;
-  e_dist = ref_dist - dist;
-  e_vel = (enc_vel_A - enc_vel_B) / 2;
+    t = millis();
+    dt = t - t_prev; 
 
-  PWM_dist = int(kp_dist * e_dist + ki_dist * err_dist + (kd_dist * (e_dist - e_prev_dist) / dt));
-  PWM_vel = int(kp_vel * e_vel + ki_vel * err_vel + (kd_vel * (e_vel - e_prev_vel) / dt));
-  PWMA = (PWM_dist - PWM_vel)*200;
-  PWMB = (PWM_dist + PWM_vel)*200;
-  PWMA = clipPWM(PWMA);
-  PWMB = clipPWM(PWMB);
+    // Read normalized values
+    Vector norm = mpu.readNormalizeGyro();
 
-  Serial.print("ref_dist:"); Serial.println(ref_dist);
-  Serial.print("PWMA:"); Serial.println(PWMA);
-  Serial.print("PWMB:"); Serial.println(PWMB);
-  Serial.print("dist:"); Serial.println(dist);
-  Serial.print("e_vel:"); Serial.println(e_vel);
+    // Calculate Pitch, Roll and Yaw
+    pitch_vel = norm.YAxis;
+    roll_vel = norm.XAxis;
+    yaw_vel = -norm.ZAxis; // cambio de signo ya que esta dado vuelta
+    pitch = pitch + pitch_vel * dt/1000;
+    roll = roll + roll_vel * dt/1000;
+    yaw = yaw + yaw_vel * dt/1000;
 
-  WriteDriverVoltageA(PWMA);
-  WriteDriverVoltageB(PWMB);
-  e_prev_dist = e_dist;
-  e_prev_vel = e_vel;
-  t_prev = t;
+    ThetaA = EncoderCountA; 
+    ThetaB = EncoderCountB;
+    Dist_A = Dist_A + ((ThetaA - ThetaA_prev)) / NFactor * pi * Diam_ruedas; // [m]
+    Dist_B = Dist_B + ((ThetaB - ThetaB_prev)) / NFactor * pi * Diam_ruedas; // [m]
+    dist = (Dist_A + Dist_B)/2;
+    dt = t - t_prev; // [ms]
+    enc_RPM_A = 1000 * (ThetaA - ThetaA_prev) / dt * 60.0 / NFactor;
+    enc_RPM_B = 1000 * (ThetaB - ThetaB_prev) / dt * 60.0 / NFactor;
+    enc_vel_A = enc_RPM_A * pi * 2 / 60.0;                  // [rad/s]
+    enc_vel_B = enc_RPM_B * pi * 2 / 60.0;                  // [rad/s]
+    ThetaA_prev = ThetaA;
+    ThetaB_prev = ThetaB;
+    theta = yaw;
+    e_dist = ref_dist - dist;
+    e_vel = (enc_vel_A - enc_vel_B) / 2;
+
+    PWM_dist = int(kp_dist * e_dist + ki_dist * err_dist + (kd_dist * (e_dist - e_prev_dist) / dt));
+    PWM_vel = int(kp_vel * e_vel + ki_vel * err_vel + (kd_vel * (e_vel - e_prev_vel) / dt));
+    PWMA = (PWM_dist)*200;
+    PWMB = (PWM_dist)*200;
+    PWMA = clipPWM(PWMA);
+    PWMB = clipPWM(PWMB);
+
+    /*Serial.print("ref_dist:"); Serial.println(ref_dist);
+    Serial.print("PWMA:"); Serial.println(PWMA);
+    Serial.print("PWMB:"); Serial.println(PWMB);
+    Serial.print("dist:"); Serial.println(dist);
+    Serial.print("e_vel:"); Serial.println(e_vel);*/
+    Serial.print("theta:"); Serial.println(theta);
+    Serial.print("encoderA:"); Serial.println(EncoderCountA);
+    Serial.print("encoderB:"); Serial.println(EncoderCountB);
+
+    WriteDriverVoltageA(0);
+    WriteDriverVoltageB(0);
+    e_prev_dist = e_dist;
+    e_prev_vel = e_vel;
+    t_prev = t;
+  }
 }
 
 void WriteDriverVoltageA(int PWM_val){
