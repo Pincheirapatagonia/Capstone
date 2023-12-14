@@ -71,11 +71,66 @@ def combine_images(image1_path, image2_path):
     return new_image
 
 
+# Global variables
+points = []
+image = None
+
+
+def click_event(event, x, y, flags, params):
+    # Check if left mouse button clicked
+    if event == cv2.EVENT_LBUTTONDOWN:
+        points.append((x, y))
+
+        # Draw line if two points have been clicked
+        if len(points) == 2:
+            cv2.line(image, points[0], points[1], (255, 0, 0), 5)
+            angle = np.arctan2(points[1][1] - points[0]
+                               [1], points[1][0] - points[0][0])
+            rotated = rotate_image(image, angle)
+            cv2.imshow('image', rotated)
+
+
+def rotate_image(image, angle):
+    # Get image dimensions
+    (h, w) = image.shape[:2]
+    # Define the pivot point
+    center = (w / 2, h / 2)
+    # Perform the rotation
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, M, (w, h))
+    return rotated
+
+
+def process_image(image_path):
+    global image
+    image = cv2.imread(image_path)
+    cv2.imshow('image', image)
+    cv2.setMouseCallback('image', click_event)
+
+    while True:
+        key = cv2.waitKey(0) & 0xFF
+        if key == ord('s'):
+            cv2.imwrite('rotated_image.jpg', image)
+            break
+        elif key == ord('r'):
+            image = cv2.imread(image_path)
+            cv2.imshow('image', image)
+            points.clear()
+
+    cv2.destroyAllWindows()
+
 list_images = ['lineaRecta\\codigoCentroDeMasa\\IMGCut.jpg', 'lineaRecta\\codigoCentroDeMasa\\IMGCut2.jpg', 'lineaRecta/codigoCentroDeMasa/IMGIzqCut.jpg', 'lineaRecta/codigoCentroDeMasa/IMGIzqCut2.jpg']
 for img in list_images:
     dilate_erode_image(img)
     
 # Use the function
-#new_image = combine_images(
-#    'lineaRecta\\codigoCentroDeMasa\\IMGCutmod.jpg', 'lineaRecta\\codigoCentroDeMasa\\IMGCut2mod.jpg')
-#new_image.save('lineaRecta\\codigoCentroDeMasa\combined_image1.png')
+new_image = combine_images(
+    'lineaRecta\\codigoCentroDeMasa\\IMGCut_mod.jpg', 'lineaRecta\\codigoCentroDeMasa\\IMGCut2_mod.jpg')
+new_image.save('lineaRecta\\codigoCentroDeMasa\combined_image1.png')
+
+new_image = combine_images(
+    'lineaRecta\\codigoCentroDeMasa\\IMGizqCut_mod.jpg', 'lineaRecta\\codigoCentroDeMasa\\IMGizqCut2_mod.jpg')
+new_image.save('lineaRecta\\codigoCentroDeMasa\combined_image2.png')
+
+# Use the function
+process_image('lineaRecta\\codigoCentroDeMasa\combined_image1.png')
