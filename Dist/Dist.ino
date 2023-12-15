@@ -19,7 +19,7 @@ MPU6050 mpu;
 
 #define baud 9600
 
-#define pi 3.1415
+#define pi 3.14159265358979
 
 
 // ************ DEFINITIONS A (L)************
@@ -47,21 +47,21 @@ float yaw_vel;
 
 // ************ VARIABES PID RPM************
 int PWM_MAX = 255;
-int PWM_MIN = 50;
-
+int PWM_MIN = 10;
+int max = 130;
 // ************ VARIABES PID POSE************
 float Pose_X, Pose_Y, Pose_Theta;
 float Vel_X, Vel_Y, Vel_Theta, Vel_Lin;
 
-float Dist_ref = 1;
+float Dist_ref = 1.0;
 float Rot_ref = 0;
-float kp_Dist = 180; // 20 // 15 // 15
-float ki_Dist = 10; //0.005 //0.006 //0.0058;   
-float kd_Dist = 0.0001; // 0.0;  // 0.0003 //0.0003
+float kp_Dist = 180; //130// 20 // 15 // 15
+float ki_Dist = 10;//11 (para2m) //0.005 //0.006 //0.0058;   
+float kd_Dist = 0.0004; // 0.0;  // 0.0003 //0.0003
 
-float kp_Rot = 1.1; // 1
+float kp_Rot = 1.05; // 1
 float ki_Rot = 0.001; // 0.000001
-float kd_Rot = 0.0000035; // 0.003
+float kd_Rot = 0.0000045; // 0.003
 
 float e_Dist, e_Dist_prev, inte_Dist, ctrl_Dist;
 float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
@@ -76,8 +76,7 @@ unsigned long t, t_prev;
 float Diam_ruedas = 0.09;
 float R_ruedas = Diam_ruedas/2;
 float L_robot = 0.370-0.055;
-float NFactor = 1500;
-int PWM_min = 150;
+float NFactor = 1400;
 int PWM_max = 255;
 
 int clipPWM(int PWM_val) {
@@ -90,11 +89,11 @@ int clipPWM(int PWM_val) {
     return PWM_val;
 }
 
-int clipPWM_err(int PWM_val) {
-    if (PWM_val > 180) {
-        PWM_val = 180;
-    } else if (PWM_val < -180) {
-        PWM_val = -180;
+int clipPWM_err(int PWM_val, int max) {
+    if (PWM_val > max) {
+        PWM_val = max;
+    } else if (PWM_val < -max) {
+        PWM_val = -max;
       
     }
     return PWM_val;
@@ -122,6 +121,7 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  delay(1000);
   mpu.calibrateGyro(100);
   t_prev = millis();
 }
@@ -171,15 +171,14 @@ void loop() {
     ctrl_Dist = kp_Dist*e_Dist + ki_Dist*inte_Dist + kd_Dist*(e_Dist - e_Dist_prev)/dt*1000;
 
   
-    ctrl_Dist = clipPWM(ctrl_Dist);
-    ctrl_Dist = clipPWM_err(ctrl_Dist);
+    ctrl_Dist = clipPWM_err(ctrl_Dist, max);
     if(ctrl_Dist + ctrl_Rot > 255){
-      PWM_A_val = 255;
-      PWM_B_val = ctrl_Dist - 2 * ctrl_Rot;
+      PWM_B_val = 255;
+      PWM_A_val = ctrl_Dist - 2 * ctrl_Rot;
     } else {
       if(ctrl_Dist - ctrl_Rot > 255){
-        PWM_B_val = 255;
-        PWM_A_val = ctrl_Dist + 2 * ctrl_Rot;
+        PWM_A_val = 255;
+        PWM_B_val = ctrl_Dist + 2 * ctrl_Rot;
       } else
       {
         PWM_A_val = ctrl_Dist - ctrl_Rot;
@@ -187,18 +186,27 @@ void loop() {
       }
     }
     
+    PWM_A_val = clipPWM(PWM_A_val);
+    PWM_B_val = clipPWM(PWM_B_val);
+
     WriteDriverVoltageA(PWM_A_val);
     WriteDriverVoltageB(PWM_B_val);
 
-    Serial.print("RPMA:");
+    /*Serial.print("RPMA:");
     Serial.print(RPM_A);
     Serial.print(",");
     Serial.print("RPMB:");
     Serial.print(RPM_B);
+    Serial.print(",");*/
+    Serial.print("Enc_A");
+    Serial.print(Enc_A);
+    Serial.print(",");
+    Serial.print("Enc_B");
+    Serial.print(Enc_B);
     Serial.print(",");
     Serial.print("PosX:");
     Serial.print(Pose_X);
-    Serial.print(",");
+    /*Serial.print(",");
     Serial.print("PosY:");
     Serial.print(Pose_Y);
     Serial.print(",");
@@ -207,7 +215,7 @@ void loop() {
     Serial.print(",");
     Serial.print("Pos_Theta_enc:");
     Serial.print(round(Pose_Theta_enc*180/pi));
-    Serial.print(",");
+    Serial.print(",");*/
     Serial.println("");
 
     t_prev = t;
@@ -284,34 +292,36 @@ void ISR_EncoderB1() {
   }
 }
 void WriteDriverVoltageA(int PWM_val){
-    if (PWM_val > 0){
+    if (PWM_val > PWM_MIN){
         digitalWrite(AIN1, HIGH);
         digitalWrite(AIN2, LOW);
     }
-    else if (PWM_val < 0){
+    else if (PWM_val < PWM_MIN){
         digitalWrite(AIN1, LOW);
         digitalWrite(AIN2, HIGH);
     }
     else {
         digitalWrite(AIN1, LOW);
         digitalWrite(AIN2, LOW);
+        PWM_val = 0;
     }
     // if (abs(PWM_val) > PWM_MAX) PWM_val = PWM_MAX;
     // if (abs(PWM_val) < PWM_MIN) PWM_val= PWM_MIN;
     analogWrite(ENA, abs(PWM_val));
 }
 void WriteDriverVoltageB(int PWM_val){
-    if (PWM_val < 0){
+    if (PWM_val < PWM_MIN){
         digitalWrite(BIN1, HIGH);
         digitalWrite(BIN2, LOW);
     }
-    else if (PWM_val > 0){
+    else if (PWM_val > PWM_MIN){
         digitalWrite(BIN1, LOW);
         digitalWrite(BIN2, HIGH);
     }
     else {
         digitalWrite(BIN1, LOW);
         digitalWrite(BIN2, LOW);
+        PWM_val = 0;
     }
     // if (abs(PWM_val) > PWM_MAX) PWM_val = PWM_MAX;
     // if (abs(PWM_val) < PWM_MIN) PWM_val= PWM_MIN;
