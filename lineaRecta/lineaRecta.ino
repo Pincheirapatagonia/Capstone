@@ -23,13 +23,13 @@ MPU6050 mpu;
 
 // Definitions
 float dist, err_dist,  e_dist = 0, e_prev_dist = 0;
-float err_vel, e_vel = 0, e_prev_vel = 0;
+float e_int, e_om = 0, e_prev_om = 0;
 //--------------------Ref-------------------------
 
 
 float ref_dist = 1;
 
-float theta, theta_old;
+float theta, theta_old, start_time;
 
 volatile long EncoderCountA = 0;
 float ThetaA, ThetaA_prev;
@@ -40,14 +40,13 @@ float ThetaB, ThetaB_prev;
 float Dist_B, vel_B, RPM_B, enc_RPM_B, enc_vel_B;
 
 //----------------KONTROL----------
-float kp_dist = 15; // 20 // 15 // 15
-float ki_dist = 0.0058; //0.005 //0.006 //0.0058; 
-float kd_dist = 0.0003; // 0.0;  // 0.0003 //0.0003
+float kp_dist = 180; // 20 // 15 // 15
+float ki_dist = 0.01; //0.005 //0.006 //0.0058; 
+float kd_dist = 0.1; // 0.0;  // 0.0003 //0.0003
 
-float kp_vel = 1; // 2 //1
-float ki_vel = 0.00000153; // 0.000001 // 0.0000015 // 0.00000153
-float kd_vel = 0.000011; //0.00001 // 0.000011 // 0.000011
-
+float kp_om = 1.1; // 1
+float ki_om = 0.000001; // 0.000001
+float kd_om = 0.0035; // 0.003
 
 
 float Diam_ruedas = 0.09;
@@ -56,6 +55,8 @@ float L_robot = 0.370-0.055;
 float NFactor = 1400;
 int PWM_min = 0;
 int PWM_max = 255;
+
+int vel_line;
 
 int dt, t, t_prev;
 int PWM_dist, PWM_vel, PWMA, PWMB;
@@ -172,11 +173,13 @@ void setup() {
   // If you don't want use threshold, comment this line or set 0.
   // mpu.setThreshold(3);
   t_prev = millis();
+  start_time = millis();
+  Serial.println("iniciando");
+  vel_line = 110;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  
   if ((millis()-t_prev)>=10){
 
     t = millis();
@@ -186,9 +189,7 @@ void loop() {
     Vector norm = mpu.readNormalizeGyro();
 
     // Calculate Pitch, Roll and Yaw
-    pitch_vel = norm.YAxis;
-    roll_vel = norm.XAxis;
-    yaw_vel = -norm.ZAxis; // cambio de signo ya que esta dado vuelta
+    yaw_vel = norm.ZAxis; // cambio de signo ya que esta dado vuelta
     pitch = pitch + pitch_vel * dt/1000;
     roll = roll + roll_vel * dt/1000;
     yaw = yaw + yaw_vel * dt/1000;
@@ -205,30 +206,47 @@ void loop() {
     enc_vel_B = enc_RPM_B * pi * 2 / 60.0;                  // [rad/s]
     ThetaA_prev = ThetaA;
     ThetaB_prev = ThetaB;
-    theta = yaw;
     e_dist = ref_dist - dist;
-    e_vel = (enc_vel_A - enc_vel_B) / 2;
+    e_om = yaw;
+
+    e_int = e_int + e_om*dt;
 
     PWM_dist = int(kp_dist * e_dist + ki_dist * err_dist + (kd_dist * (e_dist - e_prev_dist) / dt));
-    PWM_vel = int(kp_vel * e_vel + ki_vel * err_vel + (kd_vel * (e_vel - e_prev_vel) / dt));
-    PWMA = (PWM_dist)*200;
-    PWMB = (PWM_dist)*200;
+    PWM_dist = clipPWM(PWM_dist);
+    PWM_vel = int(kp_om * e_om + ki_om * e_int + (kd_om * (e_om - e_prev_om) / dt));
+
+    if(PWM_dist + PWM_vel > 255){
+      PWMA = 255;
+      PWMB = PWM_dist - 2 * PWM_vel;
+    } else
+    {
+      if(PWM_dist - PWM_vel > 255){
+        PWMB = 255;
+        PWMA = PWM_dist + 2 * PWM_vel;
+      } else
+      {
+        PWMA = (PWM_dist + PWM_vel);
+        PWMB = (PWM_dist - PWM_vel);
+      }
+    }
     PWMA = clipPWM(PWMA);
     PWMB = clipPWM(PWMB);
 
-    /*Serial.print("ref_dist:"); Serial.println(ref_dist);
+    //Serial.print("ref_dist:"); Serial.println(ref_dist);
+    
     Serial.print("PWMA:"); Serial.println(PWMA);
     Serial.print("PWMB:"); Serial.println(PWMB);
-    Serial.print("dist:"); Serial.println(dist);
+    Serial.print("e_om:"); Serial.println(e_om);
+    /*Serial.print("dist:"); Serial.println(dist);
     Serial.print("e_vel:"); Serial.println(e_vel);*/
-    Serial.print("theta:"); Serial.println(theta);
+    Serial.print("vel_angular:"); Serial.println(yaw_vel);
     Serial.print("encoderA:"); Serial.println(EncoderCountA);
     Serial.print("encoderB:"); Serial.println(EncoderCountB);
 
-    WriteDriverVoltageA(0);
-    WriteDriverVoltageB(0);
+    WriteDriverVoltageA(PWMA);
+    WriteDriverVoltageB(PWMB);
     e_prev_dist = e_dist;
-    e_prev_vel = e_vel;
+    e_prev_om = e_om;
     t_prev = t;
   }
 }

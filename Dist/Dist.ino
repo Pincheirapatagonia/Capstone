@@ -10,10 +10,11 @@ MPU6050 mpu;
 #define AIN2 5
 #define BIN1 10
 #define BIN2 9
-#define AC1 21
-#define AC2 20
-#define BC1 19
-#define BC2 18
+
+#define AC1 19 // D2
+#define AC2 18 // D3
+#define BC1 2 // D7
+#define BC2 3 // D8
 
 #define baud 9600
 
@@ -31,6 +32,9 @@ volatile long EncoderCountB = 0;
 float Enc_B, Enc_B_prev;
 float Dist_B, vel_B, RPM_B;
 int PWM_B_val;
+
+float Vel_Theta_enc, Pose_Theta_enc;
+
 
 // MPU: Pitch, Roll and Yaw values
 float pitch = 0;
@@ -50,19 +54,20 @@ float Vel_X, Vel_Y, Vel_Theta, Vel_Lin;
 
 float Dist_ref = 1;
 float Rot_ref = 0;
-float kp_Dist = 1;
-float ki_Dist = 0.1;
-float kd_Dist = 0.1;
-float kp_Rot = 0.05;
-float ki_Rot = 0.001;
-float kd_Rot = 0.001;
+float kp_Dist = 180; // 20 // 15 // 15
+float ki_Dist = 10; //0.005 //0.006 //0.0058;   
+float kd_Dist = 0.0001; // 0.0;  // 0.0003 //0.0003
+
+float kp_Rot = 1.1; // 1
+float ki_Rot = 0.001; // 0.000001
+float kd_Rot = 0.0000035; // 0.003
 
 float e_Dist, e_Dist_prev, inte_Dist, ctrl_Dist;
 float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
 
 
 // ************ TIEMPO************
-int Ts = 10 // [ms]
+int Ts = 10; // [ms]
 int dt;
 unsigned long t, t_prev;
 
@@ -74,6 +79,15 @@ float NFactor = 1500;
 int PWM_min = 150;
 int PWM_max = 255;
 
+int clipPWM(int PWM_val) {
+    if (PWM_val > 255) {
+        PWM_val = 255;
+    } else if (PWM_val < -255) {
+        PWM_val = -255;
+      
+    }
+    return PWM_val;
+}
 
 void setup() {
   Serial.begin(baud);
@@ -87,6 +101,14 @@ void setup() {
   }
   mpu.calibrateGyro();
 
+  pinMode(AC1, INPUT_PULLUP);
+  pinMode(AC2, INPUT_PULLUP);
+  pinMode(BC1, INPUT_PULLUP);
+  pinMode(BC2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(AC1), ISR_EncoderA1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(AC2), ISR_EncoderA2, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BC1), ISR_EncoderB1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BC2), ISR_EncoderB2, CHANGE);
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
@@ -119,8 +141,8 @@ void loop() {
     Pose_Theta = Vel_Theta*dt/1000 + Pose_Theta;  // [°]
 
     //Giro con ENCODER
-    // Vel_Theta = R_ruedas * (vel_B - vel_A) / L_robot; // [rad/s]
-    // Pose_Theta = Vel_Theta * dt / 1000 + Pose_Theta;  // [rad] 
+    Vel_Theta_enc = R_ruedas * (vel_B - vel_A) / L_robot; // [rad/s]
+    Pose_Theta_enc = Vel_Theta_enc * dt / 1000 + Pose_Theta_enc;  // [rad] 
 
     Vel_Lin = R_ruedas * (vel_A + vel_B) / 2; // [m/s]
     Vel_X = Vel_Lin * cos(Pose_Theta*pi/180);             // [m/s]
@@ -129,7 +151,6 @@ void loop() {
     Pose_Y = (Vel_Y*dt)/1000 + Pose_Y;      // [m]
 
     //---------------PID------------------
-
     e_Rot_prev = e_Rot;
     e_Dist_prev = e_Dist;
     e_Rot = Rot_ref - Pose_Theta;
@@ -138,11 +159,31 @@ void loop() {
     inte_Dist = (dt * (e_Dist_prev + e_Dist) / 2) / 1000;
     ctrl_Rot = kp_Rot*e_Rot + ki_Rot*inte_Rot + kd_Rot*(e_Rot - e_Rot_prev)/dt*1000;
     ctrl_Dist = kp_Dist*e_Dist + ki_Dist*inte_Dist + kd_Dist*(e_Dist - e_Dist_prev)/dt*1000;
-    PWM_A_val = ctrl_Dist - ctrl_Rot;
-    PWM_B_val = ctrl_Dist + ctrl_Rot;
-    WriteDriverVoltageA(PWM_A_val);
-    WriteDriverVoltageA(PWM_B_val);
 
+  
+    ctrl_Dist = clipPWM(ctrl_Dist);
+    if(ctrl_Dist + ctrl_Rot > 255){
+      PWM_A_val = 255;
+      PWM_B_val = ctrl_Dist - 2 * ctrl_Rot;
+    } else {
+      if(ctrl_Dist - ctrl_Rot > 255){
+        PWM_B_val = 255;
+        PWM_A_val = ctrl_Dist + 2 * ctrl_Rot;
+      } else
+      {
+        PWM_A_val = ctrl_Dist - ctrl_Rot;
+        PWM_B_val = ctrl_Dist + ctrl_Rot;
+      }
+    }
+    // WriteDriverVoltageA(PWM_A_val);
+    // WriteDriverVoltageA(PWM_B_val);
+
+    Serial.print("RPMA:");
+    Serial.print(RPM_A);
+    Serial.print(",");
+    Serial.print("RPMB:");
+    Serial.print(RPM_B);
+    Serial.print(",");
     Serial.print("PosX:");
     Serial.print(Pose_X);
     Serial.print(",");
@@ -150,7 +191,11 @@ void loop() {
     Serial.print(Pose_Y);
     Serial.print(",");
     Serial.print("Pos_Theta:");
-    Serial.print(round(Pose_Theta*180/pi));
+    Serial.print(round(Pose_Theta));
+    Serial.print(",");
+    Serial.print("Pos_Theta_enc:");
+    Serial.print(round(Pose_Theta_enc*180/pi));
+    Serial.print(",");
     Serial.println("");
 
     t_prev = t;
