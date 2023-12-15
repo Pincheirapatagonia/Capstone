@@ -55,13 +55,24 @@ float Vel_X, Vel_Y, Vel_Theta, Vel_Lin;
 
 float Dist_ref = 1.0;
 float Rot_ref = 0;
-float kp_Dist = 180; //130// 20 // 15 // 15
-float ki_Dist = 10;//11 (para2m) //0.005 //0.006 //0.0058;   
-float kd_Dist = 0.0004; // 0.0;  // 0.0003 //0.0003
 
-float kp_Rot = 1.05; // 1
-float ki_Rot = 0.001; // 0.000001
-float kd_Rot = 0.0000045; // 0.003
+// 0m
+float kp_Dist = 175; //130// 20 // 15 // 15 // 175
+float ki_Dist = 10;//11 (para2m) //0.005 //0.006 //0.0058; //10
+float kd_Dist = 0.00043; // 0.0;  // 0.0003 //0.0003 // 0.0004
+float kp_Rot = 1.053; // 1 // 1.05
+float ki_Rot = 0.001; // 0.000001 // 0.001
+float kd_Rot = 0.0000045; // 0.003 // 0.00000450
+
+
+// 1m
+float kp_Dist = 175; //130// 20 // 15 // 15 // 175
+float ki_Dist = 10;//11 (para2m) //0.005 //0.006 //0.0058; //10
+float kd_Dist = 0.00043; // 0.0;  // 0.0003 //0.0003 // 0.0004
+float kp_Rot = 1.053; // 1 // 1.05
+float ki_Rot = 0.001; // 0.000001 // 0.001
+float kd_Rot = 0.0000045; // 0.003 // 0.00000450
+
 
 float e_Dist, e_Dist_prev, inte_Dist, ctrl_Dist;
 float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
