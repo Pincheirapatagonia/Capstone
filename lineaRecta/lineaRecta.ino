@@ -2,16 +2,18 @@
 #include <MPU6050.h>
 
 #define pi 3.1415
-#define ENA 6
+#define ENA 7 // D6
 #define ENB 11
 
-#define AIN1 4
-#define AIN2 5
+#define AIN1 4 // D1
+#define AIN2 5  // D0
+
 #define BIN1 10
 #define BIN2 9
 
 #define AC1 19 // D2
 #define AC2 18 // D3
+
 #define BC1 2 // D7
 #define BC2 3 // D8
 
@@ -234,6 +236,10 @@ void loop() {
 
     //Serial.print("ref_dist:"); Serial.println(ref_dist);
     
+    Serial.print("PosX:"); Serial.println(PWMA);
+    Serial.print("PosY:"); Serial.println(PWMB);
+    Serial.print("PosZ:"); Serial.println(PWMB);
+
     Serial.print("PWMA:"); Serial.println(PWMA);
     Serial.print("PWMB:"); Serial.println(PWMB);
     Serial.print("e_om:"); Serial.println(e_om);
@@ -266,7 +272,7 @@ void WriteDriverVoltageA(int PWM_val){
     }
     if (abs(PWM_val) > PWM_max) PWM_val = PWM_max;
     if (abs(PWM_val) < PWM_min) PWM_val= PWM_min;
-    analogWrite(ENA, abs(PWM_val));
+    analogWrite(ENA, PWM_val);
 }
 void WriteDriverVoltageB(int PWM_val){
     if (PWM_val < 0){
@@ -283,5 +289,5 @@ void WriteDriverVoltageB(int PWM_val){
     }
     if (abs(PWM_val) > PWM_max) PWM_val = PWM_max;
     if (abs(PWM_val) < PWM_min) PWM_val= PWM_min;
-    analogWrite(ENB, abs(PWM_val));
+    analogWrite(ENB,PWM_val);
 }

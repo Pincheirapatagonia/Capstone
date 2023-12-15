@@ -4,8 +4,9 @@
 
 MPU6050 mpu;
 
-#define ENA 6
+#define ENA 7 
 #define ENB 11
+
 #define AIN1 4
 #define AIN2 5
 #define BIN1 10
@@ -55,12 +56,12 @@ float Vel_X, Vel_Y, Vel_Theta, Vel_Lin;
 float Dist_ref = 1;
 float Rot_ref = 0;
 float kp_Dist = 180; // 20 // 15 // 15
-float ki_Dist = 10; //0.005 //0.006 //0.0058;   
+float ki_Dist = 0.1; //0.005 //0.006 //0.0058;   
 float kd_Dist = 0.0001; // 0.0;  // 0.0003 //0.0003
 
-float kp_Rot = 1.1; // 1
-float ki_Rot = 0.001; // 0.000001
-float kd_Rot = 0.0000035; // 0.003
+float kp_Rot = 15; // 1 // 11
+float ki_Rot = 0.0005; // 0.000001 //100
+float kd_Rot = 0.001; // 0.003 // 0.0035
 
 float e_Dist, e_Dist_prev, inte_Dist, ctrl_Dist;
 float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
@@ -69,16 +70,17 @@ float e_Rot, e_Rot_prev, inte_Rot, ctrl_Rot;
 // ************ TIEMPO************
 int Ts = 10; // [ms]
 int dt;
-unsigned long t, t_prev;
+unsigned long t, t_prev, t_start;
 
 // PARAMETROS FISICOS ROBOT
 float Diam_ruedas = 0.09;
 float R_ruedas = Diam_ruedas/2;
 float L_robot = 0.370-0.055;
-float NFactor = 1500;
+float NFactor = 1400;
 int PWM_min = 150;
 int PWM_max = 255;
 
+int vel_hardcodeada;
 int clipPWM(int PWM_val) {
     if (PWM_val > 255) {
         PWM_val = 255;
@@ -101,10 +103,17 @@ void setup() {
   }
   mpu.calibrateGyro();
 
+
   pinMode(AC1, INPUT_PULLUP);
+  digitalWrite(AC1, HIGH);
   pinMode(AC2, INPUT_PULLUP);
+  digitalWrite(AC2, HIGH);
+
   pinMode(BC1, INPUT_PULLUP);
+  digitalWrite(BC1, HIGH);
   pinMode(BC2, INPUT_PULLUP);
+  digitalWrite(BC2, HIGH);
+
   attachInterrupt(digitalPinToInterrupt(AC1), ISR_EncoderA1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(AC2), ISR_EncoderA2, CHANGE);
   attachInterrupt(digitalPinToInterrupt(BC1), ISR_EncoderB1, CHANGE);
@@ -113,10 +122,20 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  
+  vel_hardcodeada = 0;
+
+  t_start = millis();
   t_prev = millis();
 }
 
 void loop() {
+  if(millis() - t_start > 1000 && millis() - t_start < 3000){
+    vel_hardcodeada = 100;
+  } 
+  if(millis() - t_start > 3000){
+    vel_hardcodeada = 0;
+  }
   if ((millis() - t_prev)>= Ts) {
     t = millis();
     dt = t - t_prev; // [ms]
@@ -155,13 +174,14 @@ void loop() {
     e_Dist_prev = e_Dist;
     e_Rot = Rot_ref - Pose_Theta;
     e_Dist = Dist_ref - Pose_X;
-    inte_Rot = (dt * (e_Rot_prev + e_Rot) / 2) / 1000;
-    inte_Dist = (dt * (e_Dist_prev + e_Dist) / 2) / 1000;
-    ctrl_Rot = kp_Rot*e_Rot + ki_Rot*inte_Rot + kd_Rot*(e_Rot - e_Rot_prev)/dt*1000;
-    ctrl_Dist = kp_Dist*e_Dist + ki_Dist*inte_Dist + kd_Dist*(e_Dist - e_Dist_prev)/dt*1000;
+    inte_Rot = inte_Rot + (dt * (e_Rot_prev + e_Rot) / 2);
+    inte_Dist = inte_Dist + (dt * (e_Dist_prev + e_Dist) / 2);
+    ctrl_Rot = kp_Rot*e_Rot + ki_Rot*inte_Rot + kd_Rot*(e_Rot - e_Rot_prev)/dt;
+    ctrl_Dist = kp_Dist*e_Dist + ki_Dist*inte_Dist + kd_Dist*(e_Dist - e_Dist_prev)/dt;
 
   
-    ctrl_Dist = clipPWM(ctrl_Dist);
+    //ctrl_Dist = clipPWM(ctrl_Dist);
+    ctrl_Dist = vel_hardcodeada;
     if(ctrl_Dist + ctrl_Rot > 255){
       PWM_A_val = 255;
       PWM_B_val = ctrl_Dist - 2 * ctrl_Rot;
@@ -175,15 +195,30 @@ void loop() {
         PWM_B_val = ctrl_Dist + ctrl_Rot;
       }
     }
-    // WriteDriverVoltageA(PWM_A_val);
-    // WriteDriverVoltageA(PWM_B_val);
+  
+    PWM_A_val = clipPWM(PWM_A_val);
+    PWM_B_val = clipPWM(PWM_B_val);
+    /*Serial.print("PWM_A_val:");
+    Serial.print(PWM_A_val);
+    Serial.print(",");
+    Serial.print("PWM_B_val:");
+    Serial.print(PWM_B_val);
+    Serial.print(",");*/
+    WriteDriverVoltageA(PWM_A_val);
+    WriteDriverVoltageB(PWM_B_val);
 
-    Serial.print("RPMA:");
-    Serial.print(RPM_A);
-    Serial.print(",");
-    Serial.print("RPMB:");
-    Serial.print(RPM_B);
-    Serial.print(",");
+    //Serial.print("RPMA:");
+    //Serial.print(RPM_A);
+    //Serial.print(",");
+    //Serial.print("RPMB:");
+    //Serial.print(RPM_B);
+    //Serial.print(",");
+    //Serial.print("EncA:");
+    //Serial.print(EncoderCountA);
+    //Serial.print(",");
+    //Serial.print("EncB:");
+    //Serial.print(EncoderCountB);
+    /*Serial.print(",");*/
     Serial.print("PosX:");
     Serial.print(Pose_X);
     Serial.print(",");
@@ -193,9 +228,12 @@ void loop() {
     Serial.print("Pos_Theta:");
     Serial.print(round(Pose_Theta));
     Serial.print(",");
-    Serial.print("Pos_Theta_enc:");
-    Serial.print(round(Pose_Theta_enc*180/pi));
-    Serial.print(",");
+    Serial.print("ctrl_Rot:");
+    Serial.print(ctrl_Rot);
+    //Serial.print(",");
+    //Serial.print("Pos_Theta_enc:");
+    //Serial.print(round(Pose_Theta_enc*180/pi));
+    //Serial.print(",");
     Serial.println("");
 
     t_prev = t;

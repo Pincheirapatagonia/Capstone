@@ -3,12 +3,11 @@
 #define trigPin 3 // TriggerSensor
 #define echoPin 2 // EchoSensor
 
-#define ServoPin 12 // Servo pin
 #define MAXANG 180 // Servo máx angle
 #define MINANG 0 // Servo min angle
 #define SCOOPDELAY 15
 
-#define ENA 6 // D6
+#define ENA 7 // D6
 #define ENB 11
 
 #define AIN1 4 // D1
@@ -17,13 +16,12 @@
 #define BIN1 10
 #define BIN2 9
 
-#define AC1 21 // D4
-#define AC2 20 // D3
 
-#define BC1 19
-#define BC2 18
+#define AC1 19 // D2
+#define AC2 18 // D3
 
-#define redLed 51
+#define BC1 2 // D7
+#define BC2 3 // D8
 
 #define baud 9600
 
@@ -205,11 +203,6 @@ void setup()
     pinMode(BC2, INPUT_PULLUP);
     digitalWrite(BC2, HIGH);
 
-    pinMode(redLed, OUTPUT);
-
-    servo.attach(servoPin, 771, 2740);
-    servo.write(angle);
-
     attachInterrupt(digitalPinToInterrupt(AC1), doEncoderA1, CHANGE); // encoder 0 PIN A
     attachInterrupt(digitalPinToInterrupt(AC2), doEncoderA2, CHANGE); // encoder 0 PIN B
 
@@ -226,138 +219,12 @@ int donothing(){
 
 void loop()
 {
-    if (((micros() - time_ant) >= Period) && state != 10 && state != 9)
-    { // Cada Period de tiempo hace el calculo
-        newtime = micros();
-        vueltas_ruedasA = (float)encoderAPos / (steps * ratio_ruedas);
-        vueltas_ruedasB = (float)encoderBPos / (steps * ratio_ruedas);
-        
-        newpositionA = encoderAPos;
-        newpositionB = encoderBPos;
-        float rpm = 249500;                                                      
-        velA = (float)(newpositionA - oldpositionA) * rpm / (newtime - time_ant);
-        oldpositionA = newpositionA;
 
-        velB = (float)(newpositionB - oldpositionB) * rpm / (newtime - time_ant);
-        oldpositionB = newpositionB;
+    Serial.print("EncA:");
+    Serial.print(encoderAPos);
+    Serial.print(",");
+    Serial.print("EncB:");
+    Serial.print(encoderBPos);
+    Serial.println(" ");
+}   
 
-        // Calculate linear velocity (in mm/s)
-        float distanceA = vueltas_ruedasA * d * 3.1415 / 10;
-        float distanceB = vueltas_ruedasB * d * 3.1415 / 10;
-
-        // Calculate the average linear velocity of both wheels
-        avance = (distanceA + distanceB) / 2;
-
-        time_ant = newtime;
-
-        Serial.print(vueltas_ruedasA);
-        Serial.print(" vueltas A, ");
-        Serial.print(vueltas_ruedasB);
-        Serial.print(" vueltas B, ");
-        Serial.print(velA);
-        Serial.print(" RPM A, ");
-        Serial.print(velB);
-        Serial.print(" RPM B, ");
-        Serial.print(avance);
-        Serial.print(" cm de avance, ");
-        Serial.print((float)newtime * 0.000001);
-        Serial.print(" s.");
-        Serial.print(state);
-        Serial.println(" Estado");
-    }
-    switch (state)
-    {
-    case 0:
-        if (avance > 10)
-        {
-            Parar();
-            ref_time = micros();
-            state = 1;
-        }
-        break;
-
-    case 1:
-        if ((micros() - ref_time) * 0.000001 > 5)
-        {
-            state = 2;
-            Atras(PWM);
-        }
-        break;
-
-    case 2:
-        if (avance < 0)
-        {
-            Parar();
-            ref_time = micros();
-            state = 3;
-        }
-        break;
-
-    case 3:
-        if ((micros() - ref_time) * 0.000001 > 3)
-        {
-            ref_time = micros();
-            Doblar_derecha(PWM);
-            state = 4;
-        }
-        break;
-        
-    case 4:
-        if ((micros() - ref_time) * 0.000001 > 3)
-        {
-            ref_time = micros();
-            Parar();
-            state = 5;
-        }
-        break;
-    case 5:
-        if ((micros() - ref_time) * 0.000001 > 3)
-        {
-            ref_time = micros();
-            Doblar_izquierda(PWM);
-            state = 6;
-        }
-        break;
-    case 6:
-        if ((micros() - ref_time) * 0.000001 > 3)
-        {
-          Parar();
-          state = 9;
-          digitalWrite(redLed, HIGH);
-        }
-        break;
-    case 7:
-      for(angle = 0; angle < 180; angle++) {                                  
-        servo.write(angle);               
-        delay(15);                   
-      } 
-      if(angle >= 180){
-        state = 8;
-      }
-    case 8:
-      for(angle = 180; angle > 0; angle--){                                
-        servo.write(angle);           
-        delay(15);       
-      } 
-      if(angle <= 0){
-        state = 9;
-      }
-    case 9:
-      donothing();
-    case 10:
-        digitalWrite(redLed, HIGH);
-        co =  round(countdown - micros()* 0.000001);
-        if(co != printedCountdown){
-          printedCountdown = co;
-        }
-        if ((micros()) * 0.000001 > 5)
-        {
-          Avanzar(PWM);
-          state = 0;
-          digitalWrite(redLed, LOW);
-        }
-        break;
-    default:
-        break;
-    }
-}
