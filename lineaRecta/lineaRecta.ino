@@ -130,6 +130,15 @@ void ISR_EncoderB1() {
     }
   }
 }
+int clipPWM_Dist(int PWM_val) {
+    if (PWM_val > 180) {
+        PWM_val = 180;
+    } else if (PWM_val < -180) {
+        PWM_val = -180;
+    }
+    return PWM_val;
+}
+
 int clipPWM(int PWM_val) {
     if (PWM_val > 255) {
         PWM_val = 255;
@@ -214,7 +223,7 @@ void loop() {
     e_int = e_int + e_om*dt;
 
     PWM_dist = int(kp_dist * e_dist + ki_dist * err_dist + (kd_dist * (e_dist - e_prev_dist) / dt));
-    PWM_dist = clipPWM(PWM_dist);
+    PWM_dist = clipPWM_Dist(PWM_dist);
     PWM_vel = int(kp_om * e_om + ki_om * e_int + (kd_om * (e_om - e_prev_om) / dt));
 
     if(PWM_dist + PWM_vel > 255){
@@ -231,8 +240,8 @@ void loop() {
         PWMB = (PWM_dist - PWM_vel);
       }
     }
-    PWMA = clipPWM(PWMA);
-    PWMB = clipPWM(PWMB);
+    PWMA = clipPWM(PWM_dist);
+    PWMB = clipPWM(PWM_dist);
 
     //Serial.print("ref_dist:"); Serial.println(ref_dist);
     
